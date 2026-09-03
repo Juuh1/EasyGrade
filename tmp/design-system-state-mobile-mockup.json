@@ -1,0 +1,137 @@
+{
+  "runId": "mobile-mockup-catolicasc-2026-09-01",
+  "fileKey": "sq85WyXWJ08YI20CddiRJy",
+  "fileUrl": "https://www.figma.com/design/sq85WyXWJ08YI20CddiRJy",
+  "phase": "phase4",
+  "step": "P4.e",
+  "entities": {
+    "collections": {
+      "Primitives": "VariableCollectionId:2:2",
+      "Semantic": "VariableCollectionId:2:3",
+      "Dimensions": "VariableCollectionId:2:4"
+    },
+    "variables": {
+      "white/1000": "VariableID:3:2",
+      "neutral/50": "VariableID:3:3",
+      "neutral/100": "VariableID:3:4",
+      "neutral/200": "VariableID:3:5",
+      "neutral/600": "VariableID:3:6",
+      "neutral/900": "VariableID:3:7",
+      "brand/wine/500": "VariableID:3:8",
+      "brand/wine/700": "VariableID:3:9",
+      "brand/coral/500": "VariableID:3:10",
+      "brand/navy/700": "VariableID:3:11",
+      "brand/gold/500": "VariableID:3:12",
+      "feedback/success/500": "VariableID:3:13",
+      "feedback/success/50": "VariableID:3:14",
+      "feedback/error/500": "VariableID:3:15",
+      "feedback/error/50": "VariableID:3:16",
+      "color/bg/default": "VariableID:4:2",
+      "color/bg/subtle": "VariableID:4:3",
+      "color/bg/brand": "VariableID:4:4",
+      "color/bg/navy": "VariableID:4:5",
+      "color/bg/success": "VariableID:4:6",
+      "color/bg/error": "VariableID:4:7",
+      "color/text/primary": "VariableID:4:8",
+      "color/text/secondary": "VariableID:4:9",
+      "color/text/on-brand": "VariableID:4:10",
+      "color/text/brand": "VariableID:4:11"
+      ,"color/text/success": "VariableID:4:12"
+      ,"color/text/error": "VariableID:4:13"
+      ,"color/border/default": "VariableID:4:14"
+      ,"color/border/strong": "VariableID:4:15"
+      ,"color/border/brand": "VariableID:4:16"
+      ,"color/border/error": "VariableID:4:17"
+      ,"color/icon/default": "VariableID:4:18"
+      ,"color/icon/secondary": "VariableID:4:19"
+      ,"color/icon/on-brand": "VariableID:4:20"
+      ,"color/icon/brand": "VariableID:4:21"
+      ,"color/action/primary": "VariableID:4:22"
+      ,"color/action/pressed": "VariableID:4:23"
+      ,"color/action/accent": "VariableID:4:24"
+      ,"color/action/warning": "VariableID:4:25"
+      ,"spacing/2xs": "VariableID:4:26"
+      ,"spacing/xs": "VariableID:4:27"
+      ,"spacing/sm": "VariableID:4:28"
+      ,"spacing/md": "VariableID:4:29"
+      ,"spacing/lg": "VariableID:4:30"
+      ,"spacing/xl": "VariableID:4:31"
+      ,"radius/sm": "VariableID:4:32"
+      ,"radius/md": "VariableID:4:33"
+      ,"radius/lg": "VariableID:4:34"
+      ,"radius/full": "VariableID:4:35"
+    },
+    "pages": {
+      "00 Cover": "0:1",
+      "01 Getting Started": "5:2",
+      "02 Foundations": "5:3",
+      "——— COMPONENTS ———": "5:4",
+      "03 Components": "5:5",
+      "——— MOCKUPS ———": "5:6",
+      "04 Mobile Mockups": "5:7",
+      "05 Utilities": "5:8"
+    },
+    "documentation": {
+      "cover": "6:2",
+      "gettingStarted": "7:2",
+      "foundations": "7:9",
+      "colorsSection": "7:13",
+      "typographySection": "7:14",
+      "dimensionsSection": "7:15"
+    },
+    "components": {
+      "pageRoot": "10:2",
+      "Button": "11:8",
+      "Form Field": "12:18",
+      "Status Chip": "14:10",
+      "History Card": "15:4",
+      "Bottom Navigation": "17:48"
+    },
+    "screens": {
+      "pageRoot": "20:2",
+      "Create Evaluation": "20:7",
+      "Success": "20:8",
+      "History": "20:9"
+    },
+    "styles": {
+      "Display/Title": "S:324dca602cffe7a26160f34f833445772096975c,",
+      "Heading/H1": "S:dceea636a75f1ccf970451e60946106636e8f9aa,",
+      "Heading/H2": "S:44e155e772e07b720ea6a396589b24e91e652cd2,",
+      "Body/Medium": "S:44a55c7ede0a47ea952103cfd819a7a09e3f973a,",
+      "Body/Small": "S:8c48458353a7f5d7e7fc9a635514cf0686fa471d,",
+      "Label/Medium": "S:1f7d817e24f8acc24d22ece25fa9346d984b4279,",
+      "Caption/Regular": "S:094fd3829b12844a716ba65d71f8d3fb1cb4ada5,",
+      "Elevation/Card": "S:c700ad98da7886d6b4216b934f207b49cca10d01,"
+    }
+  },
+  "pendingValidations": [],
+  "completedSteps": [
+    "P0.a",
+    "P0.b",
+    "P0.c",
+    "P0.d",
+    "P0.e",
+    "P0.f",
+    "P1.a",
+    "P1.b",
+    "P1.c",
+    "P1.d",
+    "P1.e",
+    "P1.f",
+    "P1.g",
+    "P1.h",
+    "P2.a",
+    "P2.b",
+    "P2.c",
+    "P3.a",
+    "P3.b",
+    "P3.c",
+    "P3.d",
+    "P3.e",
+    "P4.a",
+    "P4.b",
+    "P4.c",
+    "P4.d",
+    "P4.e"
+  ]
+}
