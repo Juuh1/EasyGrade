@@ -30,6 +30,7 @@ class AppColors {
   // Destaques e alertas
   static const Color brandCoral = Color(0xFFE5283B);
   static const Color brandNavy = Color(0xFF103A58);
+  static const Color deepNavy = Color(0xFF103A58);
   static const Color brandGold = Color(0xFFF5A623);
 
   static const Color dangerBg = Color(0xFFFCE8E8);

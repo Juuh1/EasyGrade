@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:n1_avaliacoes_app/models/status_avaliacao.dart';
+import '../models/status_avaliacao.dart';
 import '../models/avaliacao.dart';
 import '../theme/app_theme.dart';
 import 'status_badge.dart';

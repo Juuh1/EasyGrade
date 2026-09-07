@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'data/mock_data.dart';
 import 'screens/criar_avaliacao_screen.dart';
 import 'screens/historico_screen.dart';
+import 'screens/sucesso_avaliacao_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_bottom_nav.dart';
 
@@ -97,6 +99,32 @@ class _HomeScreenPlaceholder extends StatelessWidget {
                 onPressed: () => onNavigateTab(1),
                 icon: const Icon(Icons.add_circle_outline),
                 label: const Text('Criar Avaliação'),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SucessoAvaliacaoScreen(
+                        avaliacao: MockData.avaliacoes.first,
+                        onNavigateTab: onNavigateTab,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.check_circle_outline,
+                    color: AppColors.deepNavy),
+                label: const Text(
+                  'Ver Tela de Sucesso)',
+                  style: TextStyle(
+                    color: AppColors.deepNavy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                      color: AppColors.deepNavy, width: 1.5),
+                ),
               ),
             ],
           ),

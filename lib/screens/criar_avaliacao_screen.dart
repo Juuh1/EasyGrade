@@ -6,6 +6,7 @@ import '../models/avaliacao.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_bottom_nav.dart';
+import 'sucesso_avaliacao_screen.dart';
 
 // Tela de Criação de Avaliação
 class CriarAvaliacaoScreen extends StatefulWidget {
@@ -61,7 +62,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
     _dataSelecionada = DateTime(2026, 9, 12, 19, 0);
     _dataController = TextEditingController(text: '12/09/2026');
     _questoesController = TextEditingController(text: '20');
-    _turmaSelecionada = null;
+    _turmaSelecionada = '3ª fase A';
   }
 
   @override
@@ -146,56 +147,12 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
     MockData.avaliacoes.insert(0, novaAvaliacao);
     widget.onAvaliacaoCriada?.call(novaAvaliacao);
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SucessoAvaliacaoScreen(
+          avaliacao: novaAvaliacao,
+          onNavigateTab: widget.onNavigateTab,
         ),
-        icon: const Icon(
-          Icons.check_circle,
-          color: AppColors.concluidaFg,
-          size: 48,
-        ),
-        title: const Text(
-          'Avaliação Criada',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'A avaliação "${novaAvaliacao.nome}" foi cadastrada com sucesso.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('• Disciplina: ${novaAvaliacao.disciplina}'),
-                  Text('• Turma: ${novaAvaliacao.turma}'),
-                  Text(
-                      '• Formato: ${novaAvaliacao.numQuestoes} questões (${novaAvaliacao.numAlternativas} alternativas)'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }
@@ -211,7 +168,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
+              primary: AppColors.deepNavy,
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: AppColors.textPrimary,
@@ -300,14 +257,14 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
     setState(() {
       _nomeController.text = 'Prova N1 — Engenharia';
       _disciplinaController.text = 'Engenharia de Software';
-      _turmaSelecionada = null;
+      _turmaSelecionada = '3ª fase A';
       _dataController.text = '12/09/2026';
       _questoesController.text = '20';
       _numAlternativas = 5;
-      _tentouSubmeter = true;
+      _tentouSubmeter = false;
       _erroNome = false;
       _erroDisciplina = false;
-      _erroTurma = true;
+      _erroTurma = false;
       _erroData = false;
       _erroQuestoes = false;
     });
@@ -367,6 +324,42 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                     icon: const Icon(Icons.refresh, color: Colors.white70),
                     onPressed: _preencherExemplo,
                   ),
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SucessoAvaliacaoScreen(
+                            avaliacao: MockData.avaliacoes.first,
+                            onNavigateTab: widget.onNavigateTab,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.check_circle_outline,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    label: const Text(
+                      'Passo 2',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: AppColors.deepNavy,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -398,7 +391,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.8,
-                            color: AppColors.primary,
+                            color: AppColors.deepNavy,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -664,7 +657,7 @@ class _CampoTextoRotulado extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(
-                color: temErro ? AppColors.dangerFg : AppColors.primary,
+                color: temErro ? AppColors.dangerFg : AppColors.deepNavy,
                 width: 1.5,
               ),
             ),
@@ -749,7 +742,7 @@ class _SeletorTurma extends StatelessWidget {
                 Icon(
                   Icons.keyboard_arrow_down,
                   color:
-                      temErro ? AppColors.dangerFg : AppColors.textSecondary,
+                      temErro ? AppColors.dangerFg : AppColors.deepNavy,
                 ),
               ],
             ),
@@ -830,7 +823,7 @@ class _CampoData extends StatelessWidget {
                 const Icon(
                   Icons.calendar_today_outlined,
                   size: 18,
-                  color: AppColors.textSecondary,
+                  color: AppColors.deepNavy,
                 ),
               ],
             ),
@@ -907,7 +900,7 @@ class _CampoNumero extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(
-                color: temErro ? AppColors.dangerFg : AppColors.primary,
+                color: temErro ? AppColors.dangerFg : AppColors.deepNavy,
                 width: 1.5,
               ),
             ),
@@ -957,11 +950,11 @@ class _SeletorAlternativas extends StatelessWidget {
                 duration: const Duration(milliseconds: 150),
                 height: 44,
                 decoration: BoxDecoration(
-                  color: selecionado ? AppColors.primary : AppColors.surface,
+                  color: selecionado ? AppColors.deepNavy : AppColors.surface,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border.all(
                     color: selecionado
-                        ? AppColors.primary
+                        ? AppColors.deepNavy
                         : AppColors.inputBorder,
                   ),
                 ),
