@@ -99,10 +99,29 @@ class _CardInfoPrincipal extends StatelessWidget {
               StatusBadge(status: avaliacao.status),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Código: ${avaliacao.codigo}',
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.deepNavy.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: AppColors.deepNavy.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Text(
+                  'Código: ${avaliacao.codigo}',
+                  style: const TextStyle(
+                    color: AppColors.deepNavy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           const Divider(),
@@ -110,7 +129,8 @@ class _CardInfoPrincipal extends StatelessWidget {
           _LinhaInfo(label: 'Disciplina', valor: avaliacao.disciplina),
           _LinhaInfo(label: 'Turma', valor: avaliacao.turma),
           _LinhaInfo(label: 'Data', valor: avaliacao.dataLabelCurta),
-          _LinhaInfo(label: 'Questões', valor: '${avaliacao.numQuestoes} questões'),
+          _LinhaInfo(
+              label: 'Questões', valor: '${avaliacao.numQuestoes} questões'),
           _LinhaInfo(
             label: 'Alternativas',
             valor: '${avaliacao.numAlternativas} por questão',
@@ -144,8 +164,13 @@ class _CardResultados extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
-          _LinhaInfo(label: 'Total de respostas', valor: '${r.totalRespostas} alunos'),
-          _LinhaInfo(label: 'Média da turma', valor: r.mediaTurma.toStringAsFixed(1)),
+          _LinhaInfo(
+              label: 'Total de respostas', valor: '${r.totalRespostas} alunos'),
+          _LinhaInfo(
+            label: 'Média da turma',
+            valor: r.mediaTurma.toStringAsFixed(1),
+            valorColor: AppColors.primary,
+          ),
           _LinhaInfo(label: 'Maior nota', valor: r.maiorNota.toStringAsFixed(1)),
           _LinhaInfo(
             label: 'Menor nota',
@@ -161,11 +186,13 @@ class _CardResultados extends StatelessWidget {
 class _LinhaInfo extends StatelessWidget {
   final String label;
   final String valor;
+  final Color? valorColor;
   final bool ultima;
 
   const _LinhaInfo({
     required this.label,
     required this.valor,
+    this.valorColor,
     this.ultima = false,
   });
 
@@ -181,7 +208,10 @@ class _LinhaInfo extends StatelessWidget {
             child: Text(
               valor,
               textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: valorColor ?? AppColors.textPrimary,
+              ),
             ),
           ),
         ],

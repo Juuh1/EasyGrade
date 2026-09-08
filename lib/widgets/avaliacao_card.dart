@@ -32,80 +32,113 @@ class AvaliacaoCard extends StatelessWidget {
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(
+                    color: AppColors.primary,
+                    width: 4,
+                  ),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      avaliacao.nome,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  StatusBadge(status: avaliacao.status),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                avaliacao.dataLabelCurta,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13.5,
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
-              Text(
-                avaliacao.subtitulo,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: onAcaoPrincipal,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
                         child: Text(
-                          avaliacao.status.acaoPrincipal,
+                          avaliacao.nome,
                           style: const TextStyle(
-                            color: AppColors.primary,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      StatusBadge(status: avaliacao.status),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    avaliacao.dataLabelCurta,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13.5,
                     ),
                   ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_horiz,
-                        color: AppColors.textSecondary),
-                    onSelected: onMenuAcao,
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: 'duplicar', child: Text('Duplicar')),
-                      PopupMenuItem(value: 'arquivar', child: Text('Arquivar')),
-                      PopupMenuItem(
-                        value: 'excluir',
-                        child: Text('Excluir',
-                            style: TextStyle(color: AppColors.dangerFg)),
+                  const SizedBox(height: 10),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+                  Text(
+                    avaliacao.subtitulo,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: onAcaoPrincipal,
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  avaliacao.status.acaoPrincipal,
+                                  style: const TextStyle(
+                                    color: AppColors.deepNavy,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 15,
+                                  color: AppColors.deepNavy,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_horiz,
+                            color: AppColors.textSecondary),
+                        onSelected: onMenuAcao,
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'duplicar',
+                            child: Text('Duplicar'),
+                          ),
+                          PopupMenuItem(
+                            value: 'arquivar',
+                            child: Text('Arquivar'),
+                          ),
+                          PopupMenuItem(
+                            value: 'excluir',
+                            child: Text(
+                              'Excluir',
+                              style: TextStyle(color: AppColors.dangerFg),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -282,8 +282,13 @@ class _Dropdown<T> extends StatelessWidget {
       isExpanded: true,
       hint: Text(hint, style: const TextStyle(color: AppColors.textMuted)),
       icon:
-          const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
-      decoration: const InputDecoration(),
+          const Icon(Icons.keyboard_arrow_down, color: AppColors.deepNavy),
+      decoration: InputDecoration(
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderSide: const BorderSide(color: AppColors.deepNavy, width: 1.5),
+        ),
+      ),
       items: items
           .map((item) => DropdownMenuItem<T>(
                 value: item,
@@ -321,12 +326,25 @@ class _DateField extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: InputDecorator(
-            decoration: const InputDecoration(),
+            decoration: InputDecoration(
+              suffixIcon: const Icon(
+                Icons.calendar_today_outlined,
+                size: 18,
+                color: AppColors.deepNavy,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderSide:
+                    const BorderSide(color: AppColors.deepNavy, width: 1.5),
+              ),
+            ),
             child: Text(
               value == null ? 'DD/MM/AAAA' : formatter.format(value!),
               style: TextStyle(
                 color:
                     value == null ? AppColors.textMuted : AppColors.textPrimary,
+                fontWeight:
+                    value != null ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ),

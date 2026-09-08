@@ -134,7 +134,7 @@ class SucessoAvaliacaoScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.xl),
 
-                        // Card de resumo com destaque Deep Navy (#103A58)
+                        // Card de resumo
                         Container(
                           clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
@@ -267,7 +267,7 @@ class SucessoAvaliacaoScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.sm),
 
-                        // Botão secundário: Ver avaliação destacado em Deep Navy (#103A58)
+                        // Botão secundário: Ver avaliação
                         ElevatedButton.icon(
                           onPressed: () => _verAvaliacao(context),
                           icon: const Icon(

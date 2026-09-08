@@ -115,7 +115,7 @@ class _HomeScreenPlaceholder extends StatelessWidget {
                 icon: const Icon(Icons.check_circle_outline,
                     color: AppColors.deepNavy),
                 label: const Text(
-                  'Ver Tela de Sucesso)',
+                  'Ver Tela de Sucesso',
                   style: TextStyle(
                     color: AppColors.deepNavy,
                     fontWeight: FontWeight.w700,
