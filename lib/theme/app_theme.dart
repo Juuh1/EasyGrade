@@ -1,28 +1,23 @@
 import 'package:flutter/material.dart';
 
-/// Paleta e constantes de estilo extraídas do mockup do Figma
-/// (tela "Histórico" / "Detalhes da Avaliação" / modal "Filtros").
+// Cores
 class AppColors {
   AppColors._();
 
-  // Cor principal (header, botões primários, elementos ativos)
   static const Color primary = Color(0xFF8B1D3F);
   static const Color primaryDark = Color(0xFF6E1732);
 
-  // Fundo
   static const Color background = Color(0xFFF5F5F7);
   static const Color surface = Colors.white;
 
-  // Texto
   static const Color textPrimary = Color(0xFF1F2023);
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color textMuted = Color(0xFF9CA3AF);
 
-  // Bordas / divisores
   static const Color border = Color(0xFFE5E7EB);
   static const Color inputBorder = Color(0xFFD1D5DB);
 
-  // Badges de status (fundo + texto)
+  // Status
   static const Color concluidaBg = Color(0xFFDCFCE7);
   static const Color concluidaFg = Color(0xFF16A34A);
 
@@ -32,11 +27,19 @@ class AppColors {
   static const Color rascunhoBg = Color(0xFFEEEFF1);
   static const Color rascunhoFg = Color(0xFF6B7280);
 
-  // Alerta (usado em validações de formulário em outras telas do app)
+  // Destaques e alertas
+  static const Color brandCoral = Color(0xFFE5283B);
+  static const Color brandNavy = Color(0xFF103A58);
+  static const Color deepNavy = Color(0xFF103A58);
+  static const Color brandGold = Color(0xFFF5A623);
+
   static const Color dangerBg = Color(0xFFFCE8E8);
   static const Color dangerFg = Color(0xFFDC2626);
+
+  static const Color pillActiveBg = Color(0xFFFCE8E8);
 }
 
+// Raios de borda
 class AppRadius {
   AppRadius._();
   static const double sm = 8;
@@ -45,6 +48,7 @@ class AppRadius {
   static const double pill = 999;
 }
 
+// Espaçamentos
 class AppSpacing {
   AppSpacing._();
   static const double xs = 4;
@@ -54,9 +58,7 @@ class AppSpacing {
   static const double xl = 32;
 }
 
-/// Larguras usadas para tornar as telas responsivas: em telas largas
-/// (tablet / web / desktop) o conteúdo é centralizado com uma largura
-/// máxima, em vez de esticar até a borda.
+// Breakpoints
 class AppBreakpoints {
   AppBreakpoints._();
   static const double compact = 600; // celular

@@ -10,13 +10,13 @@ import '../widgets/avaliacao_card.dart';
 import '../widgets/filtros_bottom_sheet.dart';
 import 'detalhes_avaliacao_screen.dart';
 
-/// Tab rápida exibida logo abaixo da busca ("Todos" / "Agendadas" /
-/// "Concluídas"). É um atalho para o filtro de status mais comum — o
-/// modal de Filtros continua disponível para os filtros avançados.
+// Filtros rápidos
 enum _AbaRapida { todos, agendadas, concluidas }
 
 class HistoricoScreen extends StatefulWidget {
-  const HistoricoScreen({super.key});
+  final ValueChanged<int>? onNavigateTab;
+
+  const HistoricoScreen({super.key, this.onNavigateTab});
 
   @override
   State<HistoricoScreen> createState() => _HistoricoScreenState();
@@ -106,112 +106,204 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     final horizontalPadding = isWide ? AppSpacing.xl : AppSpacing.md;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Histórico')),
+      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: isWide
-                  ? AppBreakpoints.maxContentWidth *
-                      (width >= AppBreakpoints.medium ? 1.6 : 1.2)
-                  : double.infinity,
+        child: Column(
+          children: [
+            // Header
+            Container(
+              width: double.infinity,
+              color: AppColors.primary,
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                AppSpacing.md,
+                horizontalPadding,
+                AppSpacing.lg,
+              ),
+              child: const Text(
+                'Histórico',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      horizontalPadding, AppSpacing.md, horizontalPadding, 0),
-                  child: Row(
+
+            // Conteúdo principal
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isWide
+                        ? AppBreakpoints.maxContentWidth *
+                            (width >= AppBreakpoints.medium ? 1.6 : 1.2)
+                        : double.infinity,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _buscaController,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            hintText: 'Buscar por avaliação',
-                            prefixIcon: Icon(Icons.search,
-                                color: AppColors.textSecondary),
-                          ),
+                      // Barra de busca e botão de filtros
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          AppSpacing.md,
+                          horizontalPadding,
+                          0,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _buscaController,
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  hintText: 'Buscar por avaliação',
+                                  prefixIcon: const Icon(
+                                    Icons.search,
+                                    color: AppColors.deepNavy,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.sm),
+                                    borderSide: const BorderSide(
+                                      color: AppColors.deepNavy,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _FiltrosButton(
+                              quantidadeAtiva: _filtro.quantidadeFiltrosAtivos,
+                              onTap: _abrirFiltros,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      _FiltrosButton(
-                        quantidadeAtiva: _filtro.quantidadeFiltrosAtivos,
-                        onTap: _abrirFiltros,
+
+                      // Filtros rápidos
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                          vertical: AppSpacing.md,
+                        ),
+                        child: _AbaRapidaTabs(
+                          selecionada: _abaRapida,
+                          onSelect: (aba) => setState(() => _abaRapida = aba),
+                        ),
+                      ),
+
+                      // Contagem e link de limpeza
+                      Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: horizontalPadding),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${avaliacoes.length} avaliaç${avaliacoes.length == 1 ? 'ão' : 'ões'}',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (_filtro.quantidadeFiltrosAtivos > 0)
+                              InkWell(
+                                onTap: () => setState(
+                                    () => _filtro = FiltroAvaliacao.vazio),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.sm),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 2, horizontal: 4),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.close,
+                                          size: 14, color: AppColors.deepNavy),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Limpar filtros',
+                                        style: TextStyle(
+                                          color: AppColors.deepNavy,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+
+                      // Lista de avaliações
+                      Expanded(
+                        child: avaliacoes.isEmpty
+                            ? const _EstadoVazio()
+                            : ListView.separated(
+                                padding: EdgeInsets.fromLTRB(
+                                  horizontalPadding,
+                                  0,
+                                  horizontalPadding,
+                                  AppSpacing.lg,
+                                ),
+                                itemCount: avaliacoes.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: AppSpacing.md),
+                                itemBuilder: (context, index) {
+                                  final avaliacao = avaliacoes[index];
+                                  return AvaliacaoCard(
+                                    avaliacao: avaliacao,
+                                    onTap: () => _abrirDetalhes(avaliacao),
+                                    onAcaoPrincipal: () =>
+                                        _abrirDetalhes(avaliacao),
+                                    onMenuAcao: (acao) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              '$acao em "${avaliacao.nome}"'),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: horizontalPadding, vertical: AppSpacing.md),
-                  child: _AbaRapidaTabs(
-                    selecionada: _abaRapida,
-                    onSelect: (aba) => setState(() => _abaRapida = aba),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '${avaliacoes.length} avaliaç${avaliacoes.length == 1 ? 'ão' : 'ões'}',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Expanded(
-                  child: avaliacoes.isEmpty
-                      ? const _EstadoVazio()
-                      : ListView.separated(
-                          padding: EdgeInsets.fromLTRB(horizontalPadding, 0,
-                              horizontalPadding, AppSpacing.lg),
-                          itemCount: avaliacoes.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.md),
-                          itemBuilder: (context, index) {
-                            final avaliacao = avaliacoes[index];
-                            return AvaliacaoCard(
-                              avaliacao: avaliacao,
-                              onTap: () => _abrirDetalhes(avaliacao),
-                              onAcaoPrincipal: () => _abrirDetalhes(avaliacao),
-                              onMenuAcao: (acao) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        '"$acao" em "${avaliacao.nome}" (mock — sem efeito real na N1)'),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 2,
         onTap: (i) {
           if (i == 2) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(i == 0 ? 'Tela Home Page ' : 'Tela Criar'),
-            ),
-          );
+          if (widget.onNavigateTab != null) {
+            widget.onNavigateTab!(i);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(i == 0 ? 'Home' : 'Criar'),
+              ),
+            );
+          }
         },
       ),
     );
   }
 }
 
+// Botão de filtros
 class _FiltrosButton extends StatelessWidget {
   final int quantidadeAtiva;
   final VoidCallback onTap;
@@ -228,19 +320,20 @@ class _FiltrosButton extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color:
-              ativo ? AppColors.primary.withOpacity(0.08) : AppColors.surface,
+          color: ativo
+              ? AppColors.deepNavy.withValues(alpha: 0.12)
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
-            color: ativo ? AppColors.primary : AppColors.inputBorder,
+            color: ativo ? AppColors.deepNavy : AppColors.inputBorder,
+            width: ativo ? 1.5 : 1.0,
           ),
         ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Center(
-              child: Icon(Icons.tune,
-                  color: ativo ? AppColors.primary : AppColors.textSecondary),
+            const Center(
+              child: Icon(Icons.tune, color: AppColors.deepNavy),
             ),
             if (ativo)
               Positioned(
@@ -249,7 +342,7 @@ class _FiltrosButton extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(3),
                   decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                    color: AppColors.deepNavy,
                     shape: BoxShape.circle,
                   ),
                   constraints:
@@ -272,6 +365,7 @@ class _FiltrosButton extends StatelessWidget {
   }
 }
 
+// Abas de filtro rápido
 class _AbaRapidaTabs extends StatelessWidget {
   final _AbaRapida selecionada;
   final ValueChanged<_AbaRapida> onSelect;
@@ -290,11 +384,16 @@ class _AbaRapidaTabs extends StatelessWidget {
           showCheckmark: false,
           selectedColor: AppColors.primary,
           backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
           side: BorderSide(
-              color: ativo ? AppColors.primary : AppColors.inputBorder),
+            color: ativo ? AppColors.primary : AppColors.inputBorder,
+          ),
           labelStyle: TextStyle(
             color: ativo ? Colors.white : AppColors.textPrimary,
             fontWeight: FontWeight.w600,
+            fontSize: 13,
           ),
           onSelected: (_) => onSelect(aba),
         ),
@@ -319,20 +418,20 @@ class _EstadoVazio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return const Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
+        padding: EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
-            const SizedBox(height: AppSpacing.md),
-            const Text(
+            Icon(Icons.search_off, size: 48, color: AppColors.textMuted),
+            SizedBox(height: AppSpacing.md),
+            Text(
               'Nenhuma avaliação encontrada',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
             ),
-            const SizedBox(height: 6),
-            const Text(
+            SizedBox(height: 6),
+            Text(
               'Ajuste a busca ou os filtros aplicados.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary),

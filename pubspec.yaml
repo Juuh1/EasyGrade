@@ -1,7 +1,6 @@
-name: n1_avaliacoes_app
+name: easy_grade
 description: >
-  App de correção automatizada de provas — Módulo Listagem & Domínio (N1).
-  Telas mock: Histórico (listagem), Detalhes da Avaliação e Modal de Filtros/Busca.
+  App de correção automatizada de provas
 publish_to: 'none'
 version: 0.1.0
 

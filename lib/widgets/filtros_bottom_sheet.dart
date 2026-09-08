@@ -6,9 +6,7 @@ import '../models/filtro_avaliacao.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
 
-/// Abre o modal de Filtros/Busca por cima da tela de Histórico e retorna
-/// o [FiltroAvaliacao] resultante quando o usuário toca em "Aplicar
-/// filtros" (ou `null` se ele fechar o modal sem aplicar).
+// Modal de filtros
 Future<FiltroAvaliacao?> showFiltrosBottomSheet(
   BuildContext context, {
   required FiltroAvaliacao filtroAtual,
@@ -156,7 +154,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
                             label: Text(s.label),
                             selected: selecionado,
                             showCheckmark: false,
-                            selectedColor: AppColors.primary.withOpacity(0.08),
+                            selectedColor: AppColors.pillActiveBg,
                             backgroundColor: AppColors.surface,
                             side: BorderSide(
                               color: selecionado
@@ -280,12 +278,17 @@ class _Dropdown<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       hint: Text(hint, style: const TextStyle(color: AppColors.textMuted)),
       icon:
-          const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
-      decoration: const InputDecoration(),
+          const Icon(Icons.keyboard_arrow_down, color: AppColors.deepNavy),
+      decoration: InputDecoration(
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderSide: const BorderSide(color: AppColors.deepNavy, width: 1.5),
+        ),
+      ),
       items: items
           .map((item) => DropdownMenuItem<T>(
                 value: item,
@@ -323,12 +326,25 @@ class _DateField extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: InputDecorator(
-            decoration: const InputDecoration(),
+            decoration: InputDecoration(
+              suffixIcon: const Icon(
+                Icons.calendar_today_outlined,
+                size: 18,
+                color: AppColors.deepNavy,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderSide:
+                    const BorderSide(color: AppColors.deepNavy, width: 1.5),
+              ),
+            ),
             child: Text(
               value == null ? 'DD/MM/AAAA' : formatter.format(value!),
               style: TextStyle(
                 color:
                     value == null ? AppColors.textMuted : AppColors.textPrimary,
+                fontWeight:
+                    value != null ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ),

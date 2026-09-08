@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
 
-/// Pill colorida usada tanto no card do Histórico quanto no cabeçalho
-/// da tela de Detalhes para indicar o status da avaliação.
+// Badge de status
 class StatusBadge extends StatelessWidget {
   final StatusAvaliacao status;
 

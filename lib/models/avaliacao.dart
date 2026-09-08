@@ -1,26 +1,16 @@
 import 'resultado_avaliacao.dart';
 import 'status_avaliacao.dart';
 
-/// Entidade central do domínio: uma avaliação (prova) criada pelo professor.
-///
-/// Reúne os dados usados tanto no card da listagem (Histórico) quanto na
-/// tela de Detalhes. Na N1 os dados vêm de [mockData], sem banco de dados;
-/// na N2 este mesmo modelo passa a ser lido/gravado no Firestore.
 class Avaliacao {
   final String id;
   final String codigo;
   final String nome;
   final String disciplina;
   final String turma;
-
-  /// Nula quando a avaliação ainda não tem data marcada (ex.: rascunho).
   final DateTime? data;
-
   final int numQuestoes;
   final int numAlternativas;
   final StatusAvaliacao status;
-
-  /// Preenchido apenas quando [status] é [StatusAvaliacao.concluida].
   final ResultadoAvaliacao? resultado;
 
   const Avaliacao({
@@ -36,7 +26,6 @@ class Avaliacao {
     this.resultado,
   });
 
-  /// Texto amigável mostrado no lugar da data quando ela não existe.
   String get dataLabelCurta =>
       data == null ? 'Sem data definida' : _formatarDataCurta(data!);
 

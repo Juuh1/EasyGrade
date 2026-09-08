@@ -2,12 +2,7 @@ import '../models/avaliacao.dart';
 import '../models/resultado_avaliacao.dart';
 import '../models/status_avaliacao.dart';
 
-/// Fonte de dados fictícia exigida pelo escopo da N1 (C2: "telas navegáveis
-/// com dados mock"). Simula o que, a partir da N2, virá do Firestore.
-///
-/// Mantida como uma classe utilitária (em vez de só uma lista solta) para
-/// já deixar um ponto único de acesso que, na N2, pode ser trocado por um
-/// repositório real sem alterar as telas que o consomem.
+// Dados simulados para testes
 class MockData {
   MockData._();
 
@@ -53,13 +48,10 @@ class MockData {
     ),
   ];
 
-  /// Todas as disciplinas distintas presentes no mock — usado para
-  /// popular o dropdown "Disciplina" do modal de Filtros.
+  // Listas de apoio
   static List<String> get disciplinas =>
       avaliacoes.map((a) => a.disciplina).toSet().toList()..sort();
 
-  /// Todas as turmas distintas presentes no mock — usado para popular o
-  /// dropdown "Turma" do modal de Filtros.
   static List<String> get turmas =>
       avaliacoes.map((a) => a.turma).toSet().toList()..sort();
 }

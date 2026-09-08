@@ -1,8 +1,3 @@
-/// Resultados agregados de uma avaliação já corrigida.
-///
-/// Corresponde ao bloco "Resultados obtidos" da tela de Detalhes:
-/// total de alunos que responderam, média da turma, maior e menor nota.
-/// Só existe para avaliações com status [StatusAvaliacao.concluida].
 class ResultadoAvaliacao {
   final int totalRespostas;
   final double mediaTurma;

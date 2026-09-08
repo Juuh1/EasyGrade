@@ -1,10 +1,5 @@
 import 'status_avaliacao.dart';
 
-/// Representa o estado do modal de Filtros/Busca da tela de Histórico.
-///
-/// É um objeto imutável: cada alteração no modal gera uma nova instância
-/// via [copyWith], o que facilita comparar "antes/depois" e resetar tudo
-/// com [FiltroAvaliacao.vazio].
 class FiltroAvaliacao {
   final String busca;
   final Set<StatusAvaliacao> status;
