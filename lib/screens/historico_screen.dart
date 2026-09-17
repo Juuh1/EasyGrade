@@ -162,13 +162,13 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                                   hintText: 'Buscar por avaliação',
                                   prefixIcon: const Icon(
                                     Icons.search,
-                                    color: AppColors.deepNavy,
+                                    color: AppColors.primary,
                                   ),
                                   focusedBorder: OutlineInputBorder(
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.sm),
                                     borderSide: const BorderSide(
-                                      color: AppColors.deepNavy,
+                                      color: AppColors.primary,
                                       width: 1.5,
                                     ),
                                   ),
@@ -223,12 +223,12 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                                   child: Row(
                                     children: [
                                       Icon(Icons.close,
-                                          size: 14, color: AppColors.deepNavy),
+                                          size: 14, color: AppColors.primary),
                                       SizedBox(width: 4),
                                       Text(
                                         'Limpar filtros',
                                         style: TextStyle(
-                                          color: AppColors.deepNavy,
+                                          color: AppColors.primary,
                                           fontSize: 12.5,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -321,11 +321,11 @@ class _FiltrosButton extends StatelessWidget {
         height: 48,
         decoration: BoxDecoration(
           color: ativo
-              ? AppColors.deepNavy.withValues(alpha: 0.12)
+              ? AppColors.primary.withValues(alpha: 0.12)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(
-            color: ativo ? AppColors.deepNavy : AppColors.inputBorder,
+            color: ativo ? AppColors.primary : AppColors.inputBorder,
             width: ativo ? 1.5 : 1.0,
           ),
         ),
@@ -333,7 +333,7 @@ class _FiltrosButton extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             const Center(
-              child: Icon(Icons.tune, color: AppColors.deepNavy),
+              child: Icon(Icons.tune, color: AppColors.primary),
             ),
             if (ativo)
               Positioned(
@@ -342,7 +342,7 @@ class _FiltrosButton extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(3),
                   decoration: const BoxDecoration(
-                    color: AppColors.deepNavy,
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   constraints:
