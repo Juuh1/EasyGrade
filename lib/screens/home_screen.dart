@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/perfil_screen.dart';
 import '../widgets/app_bottom_nav.dart';
 
 class HomePage extends StatelessWidget {
