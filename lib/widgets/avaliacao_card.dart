@@ -96,7 +96,7 @@ class AvaliacaoCard extends StatelessWidget {
                                 Text(
                                   avaliacao.status.acaoPrincipal,
                                   style: const TextStyle(
-                                    color: AppColors.deepNavy,
+                                    color: AppColors.primary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 14,
                                   ),
@@ -105,7 +105,7 @@ class AvaliacaoCard extends StatelessWidget {
                                 const Icon(
                                   Icons.arrow_forward_rounded,
                                   size: 15,
-                                  color: AppColors.deepNavy,
+                                  color: AppColors.primary,
                                 ),
                               ],
                             ),
