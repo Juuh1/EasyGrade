@@ -28,18 +28,14 @@ class HomePage extends StatelessWidget {
               horizontal: 12,
               vertical: 6,
             ),
-
             width: double.infinity,
             height: double.infinity,
-
             decoration: BoxDecoration(
               color: surfaceColor,
               borderRadius: BorderRadius.circular(9),
             ),
-
             child: ClipRRect(
               borderRadius: BorderRadius.circular(9),
-
               child: Column(
                 children: [
                   // =====================================
@@ -50,11 +46,9 @@ class HomePage extends StatelessWidget {
                     width: double.infinity,
                     height: 86,
                     color: primaryColor,
-
                     padding: const EdgeInsets.symmetric(
                       horizontal: 25,
                     ),
-
                     child: const Row(
                       children: [
                         Icon(
@@ -62,11 +56,9 @@ class HomePage extends StatelessWidget {
                           color: Colors.white,
                           size: 38,
                         ),
-
                         SizedBox(width: 10),
-
                         Text(
-                          'Olá Professor!',
+                          'Olá User!',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -93,14 +85,11 @@ class HomePage extends StatelessWidget {
                             color: primaryColor,
                             size: 55,
                           ),
-
                           Positioned(
                             right: 0,
                             bottom: 0,
-
                             child: Container(
                               color: surfaceColor,
-
                               child: Icon(
                                 Icons.check_circle_outline,
                                 color: primaryColor,
@@ -110,12 +99,9 @@ class HomePage extends StatelessWidget {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 4),
-
                       Text(
                         'EasyGrade',
-
                         style: TextStyle(
                           color: primaryColor,
                           fontSize: 20,
@@ -133,7 +119,6 @@ class HomePage extends StatelessWidget {
 
                   MenuButton(
                     texto: 'Minhas Avaliações',
-
                     onPressed: () {
                       // Índice 2 = Histórico
                       onNavigateTab(2);
@@ -148,7 +133,6 @@ class HomePage extends StatelessWidget {
 
                   MenuButton(
                     texto: 'Nova avaliação',
-
                     onPressed: () {
                       // Índice 1 = Criar Avaliação
                       onNavigateTab(1);
@@ -163,13 +147,11 @@ class HomePage extends StatelessWidget {
 
                   MenuButton(
                     texto: 'Meu perfil',
-
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Tela de perfil ainda não disponível.',
-                          ),
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PerfilScreen(onNavigateTab: onNavigateTab),
                         ),
                       );
                     },
@@ -193,7 +175,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-
 // =====================================
 // BOTÃO PERSONALIZADO
 // =====================================
@@ -215,23 +196,18 @@ class MenuButton extends StatelessWidget {
     return SizedBox(
       width: 400,
       height: 52,
-
       child: ElevatedButton(
         onPressed: onPressed,
-
         style: ElevatedButton.styleFrom(
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: Colors.white,
           elevation: 0,
-
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(13),
           ),
         ),
-
         child: Text(
           texto,
-
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
