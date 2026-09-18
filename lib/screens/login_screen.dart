@@ -14,21 +14,35 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _usuarioTeste = 'User';
+  static const _senhaTeste = 'User';
+
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usuarioController = TextEditingController();
   final _senhaController = TextEditingController();
   bool _mostrarSenha = false;
   bool _lembrarAcesso = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usuarioController.dispose();
     _senhaController.dispose();
     super.dispose();
   }
 
   void _entrar() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final usuarioValido = _usuarioController.text.trim() == _usuarioTeste;
+    final senhaValida = _senhaController.text == _senhaTeste;
+
+    if (!usuarioValido || !senhaValida) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Usuário ou senha inválidos.')),
+      );
+      return;
+    }
+
     widget.onLogin();
   }
 
@@ -78,14 +92,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _usuarioController,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        labelText: 'E-mail',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Usuário',
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
-                      validator: _validarEmail,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                              ? 'Informe seu usuário.'
+                              : null,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     TextFormField(
@@ -107,10 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       validator: (value) {
-                        if (value == null || value.isEmpty)
+                        if (value == null || value.isEmpty) {
                           return 'Informe sua senha.';
-                        if (value.length < 6)
-                          return 'A senha deve ter pelo menos 6 caracteres.';
+                        }
                         return null;
                       },
                     ),
@@ -121,9 +136,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           onChanged: (value) =>
                               setState(() => _lembrarAcesso = value ?? false),
                         ),
-                        const Text('Lembrar meu acesso'),
-                        const Spacer(),
+                        const Expanded(child: Text('Lembrar meu acesso')),
                         TextButton(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
                           onPressed: _abrirRecuperacao,
                           child: const Text('Esqueci a senha'),
                         ),
@@ -135,8 +152,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text('Entrar'),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('Ainda não tem uma conta?'),
                         TextButton(
@@ -146,11 +164,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    const Text(
-                      'Acesso demonstrativo local. A autenticação será conectada ao backend posteriormente.',
-                      textAlign: TextAlign.center,
-                      style:
-                          TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.pillActiveBg,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: const Column(
+                        children: [
+                          Text(
+                            'Acesso de teste',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Usuário: User  •  Senha: User',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Autenticação local para demonstração da N1.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -160,12 +207,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  String? _validarEmail(String? value) {
-    if (value == null || value.trim().isEmpty) return 'Informe seu e-mail.';
-    final valido = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim());
-    return valido ? null : 'Informe um e-mail válido.';
   }
 }
 

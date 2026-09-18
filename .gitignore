@@ -29,6 +29,7 @@ tmp/
 .pub-cache/
 .pub/
 /build/
+/entrega/*.apk
 
 
 app.*.symbols

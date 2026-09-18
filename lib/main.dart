@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'data/mock_data.dart';
 import 'screens/criar_avaliacao_screen.dart';
 import 'screens/historico_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/sucesso_avaliacao_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/perfil_screen.dart';
 import 'theme/app_theme.dart';
-import 'widgets/app_bottom_nav.dart';
 
 void main() {
   runApp(const N1App());

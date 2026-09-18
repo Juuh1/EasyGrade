@@ -14,8 +14,8 @@ class PerfilScreen extends StatefulWidget {
 }
 
 class _PerfilScreenState extends State<PerfilScreen> {
-  String _nome = 'Professor';
-  String _email = 'professor@catolicasc.edu.br';
+  String _nome = 'User';
+  String _email = 'user@easygrade.app';
   String _instituicao = 'Católica de Santa Catarina';
 
   Future<void> _editarUsuario() async {
