@@ -1,11 +1,11 @@
 {
-    "name": "n1_mobile_membro2",
-    "short_name": "n1_mobile_membro2",
+    "name": "EasyGrade",
+    "short_name": "EasyGrade",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F8F6FA",
+    "theme_color": "#7952B9",
+    "description": "Protótipo N1 para preparar e corrigir avaliações objetivas em papel.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

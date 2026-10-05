@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
 
-// Badge de status
 class StatusBadge extends StatelessWidget {
   final StatusAvaliacao status;
 

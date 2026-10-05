@@ -1,147 +1,71 @@
 import 'package:flutter/material.dart';
-import '../models/status_avaliacao.dart';
 import '../models/avaliacao.dart';
 import '../theme/app_theme.dart';
 import 'status_badge.dart';
 
-// Card de avaliação
 class AvaliacaoCard extends StatelessWidget {
   final Avaliacao avaliacao;
   final VoidCallback onTap;
-  final VoidCallback onAcaoPrincipal;
-  final void Function(String acao)? onMenuAcao;
-
-  const AvaliacaoCard({
-    super.key,
-    required this.avaliacao,
-    required this.onTap,
-    required this.onAcaoPrincipal,
-    this.onMenuAcao,
-  });
-
+  const AvaliacaoCard(
+      {super.key, required this.avaliacao, required this.onTap});
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: AppColors.primary,
-                    width: 4,
-                  ),
-                ),
-              ),
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          avaliacao.nome,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      StatusBadge(status: avaliacao.status),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    avaliacao.dataLabelCurta,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Divider(height: 1),
-                  const SizedBox(height: 10),
-                  Text(
-                    avaliacao.subtitulo,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: onAcaoPrincipal,
-                          borderRadius: BorderRadius.circular(AppRadius.sm),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  avaliacao.status.acaoPrincipal,
+  Widget build(BuildContext context) => Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: const BorderSide(color: AppColors.border)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+              onTap: onTap,
+              child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                  color: AppColors.softPurple,
+                                  borderRadius: BorderRadius.circular(10)),
+                              child: const Icon(Icons.assignment_outlined,
+                                  color: AppColors.primary, size: 18)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Text(avaliacao.disciplina,
                                   style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 15,
-                                  color: AppColors.primary,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_horiz,
-                            color: AppColors.textSecondary),
-                        onSelected: onMenuAcao,
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
-                            value: 'duplicar',
-                            child: Text('Duplicar'),
-                          ),
-                          PopupMenuItem(
-                            value: 'arquivar',
-                            child: Text('Arquivar'),
-                          ),
-                          PopupMenuItem(
-                            value: 'excluir',
-                            child: Text(
-                              'Excluir',
-                              style: TextStyle(color: AppColors.dangerFg),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textSecondary))),
+                          StatusBadge(status: avaliacao.status)
+                        ]),
+                        const SizedBox(height: 16),
+                        Text(avaliacao.nome,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.3)),
+                        const SizedBox(height: 6),
+                        Text(
+                            '${avaliacao.turma}  ·  ${avaliacao.numQuestoes} questões',
+                            style: const TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary)),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          const Icon(Icons.calendar_today_outlined,
+                              size: 13, color: AppColors.textMuted),
+                          const SizedBox(width: 7),
+                          Expanded(
+                              child: Text(avaliacao.dataLabelCurta,
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textMuted))),
+                          const Icon(Icons.arrow_forward_rounded,
+                              size: 18, color: AppColors.primary)
+                        ]),
+                      ])))));
 }

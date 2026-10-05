@@ -17,10 +17,6 @@ tmp/
 *.iws
 .idea/
 
-# preparo de pasta pra possivelmente excluir
-#.vscode/
-
-
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -31,10 +27,10 @@ tmp/
 /build/
 /entrega/*.apk
 
-
+# Arquivos locais de apoio
+/.codex*/
+/docs/design/
 app.*.symbols
-
-
 app.*.map.json
 
 # Android Studio
