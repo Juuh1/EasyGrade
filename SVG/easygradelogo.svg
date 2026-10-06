@@ -3,12 +3,12 @@
     <style>
       .cls-1 {
         font-size: 50px;
-        fill: #e5283b;
+        fill: #7952B9;
         font-family: Tahoma;
       }
 
       .cls-2 {
-        fill: #103a58;
+        fill: #342047;
       }
     </style>
   </defs>

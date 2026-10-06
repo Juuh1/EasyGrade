@@ -1,978 +1,282 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-
-import '../data/mock_data.dart';
+import '../data/session_store.dart';
 import '../models/avaliacao.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_bottom_nav.dart';
-import 'sucesso_avaliacao_screen.dart';
+import '../widgets/app_ui.dart';
+import 'auth_screens.dart';
+import 'detalhes_avaliacao_screen.dart';
+import 'gabarito_screen.dart';
 
-// Tela de Criação de Avaliação
 class CriarAvaliacaoScreen extends StatefulWidget {
-  final ValueChanged<int>? onNavigateTab;
-  final ValueChanged<Avaliacao>? onAvaliacaoCriada;
-
-  const CriarAvaliacaoScreen({
-    super.key,
-    this.onNavigateTab,
-    this.onAvaliacaoCriada,
-  });
-
+  final String? avaliacaoId;
+  const CriarAvaliacaoScreen({super.key, this.avaliacaoId});
   @override
   State<CriarAvaliacaoScreen> createState() => _CriarAvaliacaoScreenState();
 }
 
 class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
-  final _scrollController = ScrollController();
-
-  // Controladores
-  late final TextEditingController _nomeController;
-  late final TextEditingController _disciplinaController;
-  late final TextEditingController _dataController;
-  late final TextEditingController _questoesController;
-
-  // Estado dos campos
-  String? _turmaSelecionada;
-  int _numAlternativas = 5;
-  DateTime? _dataSelecionada;
-
-  // Validação
-  bool _tentouSubmeter = false;
-  bool _erroNome = false;
-  bool _erroDisciplina = false;
-  bool _erroTurma = false;
-  bool _erroData = false;
-  bool _erroQuestoes = false;
-
-  final List<String> _opcoesTurmas = [
-    '3ª fase A',
-    '2ª fase B',
-    '1ª fase A',
-    '4ª fase B',
-    '5ª fase A',
-  ];
-
+  final _form = GlobalKey<FormState>();
+  final _nome = TextEditingController(),
+      _disciplina = TextEditingController(),
+      _quantidade = TextEditingController(text: '10');
+  String? _turma;
+  DateTime? _data;
+  TimeOfDay _hora = const TimeOfDay(hour: 8, minute: 0);
+  int _alternativas = 5;
+  bool _loaded = false;
+  bool _temCorrecoes = false;
+  bool get _edicao => widget.avaliacaoId != null;
   @override
-  void initState() {
-    super.initState();
-    _nomeController = TextEditingController(text: 'Prova N1 — Engenharia');
-    _disciplinaController =
-        TextEditingController(text: 'Engenharia de Software');
-    _dataSelecionada = DateTime(2026, 9, 12, 19, 0);
-    _dataController = TextEditingController(text: '12/09/2026');
-    _questoesController = TextEditingController(text: '20');
-    _turmaSelecionada = '3ª fase A';
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loaded) {
+      _loaded = true;
+      if (_edicao) {
+        final a = SessionScope.of(context).avaliacao(widget.avaliacaoId!);
+        _temCorrecoes = SessionScope.of(context).correcoes(a.id).isNotEmpty;
+        _nome.text = a.nome;
+        _disciplina.text = a.disciplina;
+        _turma = a.turma;
+        _data = a.data;
+        _alternativas = a.numAlternativas;
+        _quantidade.text = '${a.numQuestoes}';
+        if (a.data != null) _hora = TimeOfDay.fromDateTime(a.data!);
+      }
+    }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
-    _nomeController.dispose();
-    _disciplinaController.dispose();
-    _dataController.dispose();
-    _questoesController.dispose();
+    _nome.dispose();
+    _disciplina.dispose();
+    _quantidade.dispose();
     super.dispose();
   }
 
-  // Validação dos campos
-  bool _validarFormulario() {
-    final nomeInvalido = _nomeController.text.trim().isEmpty;
-    final disciplinaInvalida = _disciplinaController.text.trim().isEmpty;
-    final turmaInvalida =
-        _turmaSelecionada == null || _turmaSelecionada!.trim().isEmpty;
-    final dataInvalida = _dataController.text.trim().isEmpty;
-    final questoesQtd = int.tryParse(_questoesController.text.trim()) ?? 0;
-    final questoesInvalida = questoesQtd <= 0;
-
-    setState(() {
-      _tentouSubmeter = true;
-      _erroNome = nomeInvalido;
-      _erroDisciplina = disciplinaInvalida;
-      _erroTurma = turmaInvalida;
-      _erroData = dataInvalida;
-      _erroQuestoes = questoesInvalida;
-    });
-
-    final temErro = nomeInvalido ||
-        disciplinaInvalida ||
-        turmaInvalida ||
-        dataInvalida ||
-        questoesInvalida;
-
-    if (temErro) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-      return false;
-    }
-
-    return true;
-  }
-
-  void _aoClicarCriar() {
-    final valido = _validarFormulario();
-
-    if (!valido) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Atenção: preencha os campos destacados antes de continuar.',
-            style: TextStyle(fontWeight: FontWeight.w500),
-          ),
-          backgroundColor: AppColors.dangerFg,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
-
-    final novaAvaliacao = Avaliacao(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      codigo: 'EVAL-2026-N${MockData.avaliacoes.length + 1}',
-      nome: _nomeController.text.trim(),
-      disciplina: _disciplinaController.text.trim(),
-      turma: _turmaSelecionada!,
-      data: _dataSelecionada ?? DateTime.now(),
-      numQuestoes: int.tryParse(_questoesController.text.trim()) ?? 20,
-      numAlternativas: _numAlternativas,
-      status: StatusAvaliacao.agendada,
-    );
-
-    MockData.avaliacoes.insert(0, novaAvaliacao);
-    widget.onAvaliacaoCriada?.call(novaAvaliacao);
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SucessoAvaliacaoScreen(
-          avaliacao: novaAvaliacao,
-          onNavigateTab: widget.onNavigateTab,
-        ),
-      ),
-    );
-  }
-
   Future<void> _selecionarData() async {
-    final hoje = DateTime.now();
-    final dataEscolhida = await showDatePicker(
-      context: context,
-      initialDate: _dataSelecionada ?? hoje,
-      firstDate: DateTime(2025, 1, 1),
-      lastDate: DateTime(2030, 12, 31),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.deepNavy,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
+    final initial = _data ?? DateTime.now();
+    final date = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(2020),
+        lastDate: DateTime(2040),
+        helpText: 'Data da avaliação',
+        cancelText: 'Cancelar',
+        confirmText: 'Selecionar');
+    if (!mounted || date == null) return;
+    setState(() => _data = date);
+  }
 
-    if (dataEscolhida != null) {
-      setState(() {
-        _dataSelecionada = dataEscolhida;
-        _dataController.text = DateFormat('dd/MM/yyyy').format(dataEscolhida);
-        if (_tentouSubmeter) _erroData = false;
-      });
+  void _salvar() {
+    if (!_form.currentState!.validate()) return;
+    final store = SessionScope.of(context);
+    final stamp = DateTime.now().microsecondsSinceEpoch.toString();
+    final old = _edicao ? store.avaliacao(widget.avaliacaoId!) : null;
+    final a = Avaliacao(
+        id: old?.id ?? stamp,
+        codigo: old?.codigo ?? 'EG-${stamp.substring(stamp.length - 6)}',
+        nome: _nome.text.trim(),
+        disciplina: _disciplina.text.trim(),
+        turma: _turma!,
+        data: _data == null
+            ? null
+            : DateTime(_data!.year, _data!.month, _data!.day, _hora.hour,
+                _hora.minute),
+        numQuestoes: int.parse(_quantidade.text),
+        numAlternativas: _alternativas,
+        status: old?.status ?? StatusAvaliacao.rascunho);
+    store.salvar(a);
+    if (_edicao) {
+      Navigator.pop(context);
+      avisar(context, 'Avaliação atualizada nesta sessão.');
+    } else {
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => SucessoAvaliacaoScreen(avaliacaoId: a.id)));
     }
   }
 
-  void _abrirSeletorTurma() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+  @override
+  Widget build(BuildContext context) => AppPage(
+      title: _edicao ? 'Editar avaliação' : 'Nova avaliação',
+      child: ListView(padding: const EdgeInsets.all(24), children: [
+        PageHeading(
+            title: _edicao ? 'Editar avaliação' : 'Nova avaliação',
+            subtitle:
+                'Comece pelos detalhes. Depois, prepare o gabarito e as folhas de resposta.'),
+        Form(
+            key: _form,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Selecione uma turma',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                ..._opcoesTurmas.map((turma) {
-                  final selecionada = _turmaSelecionada == turma;
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      turma,
-                      style: TextStyle(
-                        fontWeight:
-                            selecionada ? FontWeight.w700 : FontWeight.w500,
-                        color: selecionada
-                            ? AppColors.primary
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                    trailing: selecionada
-                        ? const Icon(Icons.check, color: AppColors.primary)
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        _turmaSelecionada = turma;
-                        if (_tentouSubmeter) _erroTurma = false;
-                      });
-                      Navigator.of(ctx).pop();
-                    },
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Preenchimento de exemplo
-  void _preencherExemplo() {
-    setState(() {
-      _nomeController.text = 'Prova N1 — Engenharia';
-      _disciplinaController.text = 'Engenharia de Software';
-      _turmaSelecionada = '3ª fase A';
-      _dataController.text = '12/09/2026';
-      _questoesController.text = '20';
-      _numAlternativas = 5;
-      _tentouSubmeter = false;
-      _erroNome = false;
-      _erroDisciplina = false;
-      _erroTurma = false;
-      _erroData = false;
-      _erroQuestoes = false;
-    });
-
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isWide = width >= AppBreakpoints.compact;
-    final horizontalPadding = isWide ? AppSpacing.xl : AppSpacing.md;
-
-    final temAlgumErro = _tentouSubmeter &&
-        (_erroNome ||
-            _erroDisciplina ||
-            _erroTurma ||
-            _erroData ||
-            _erroQuestoes);
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              width: double.infinity,
-              color: AppColors.primary,
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.md,
-                horizontalPadding,
-                AppSpacing.lg,
-              ),
-              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Criar avaliação',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Preencher exemplo',
-                    icon: const Icon(Icons.refresh, color: Colors.white70),
-                    onPressed: _preencherExemplo,
-                  ),
-                  const SizedBox(width: 4),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => SucessoAvaliacaoScreen(
-                            avaliacao: MockData.avaliacoes.first,
-                            onNavigateTab: widget.onNavigateTab,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.check_circle_outline,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    label: const Text(
-                      'Passo 2',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                      backgroundColor: AppColors.deepNavy,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Formulário
-            Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isWide
-                        ? AppBreakpoints.maxContentWidth
-                        : double.infinity,
-                  ),
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    padding: EdgeInsets.fromLTRB(
-                      horizontalPadding,
-                      AppSpacing.md,
-                      horizontalPadding,
-                      AppSpacing.xl,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Seção
-                        const Text(
-                          'ETAPA ÚNICA · DADOS DA AVALIAÇÃO',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                            color: AppColors.deepNavy,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-
-                        // Alerta de validação
-                        if (temAlgumErro) ...[
-                          _BannerAlertaValidacao(
-                            mensagem: _erroTurma &&
-                                    !_erroNome &&
-                                    !_erroDisciplina &&
-                                    !_erroData &&
-                                    !_erroQuestoes
-                                ? 'Revise o campo em vermelho antes de continuar.'
-                                : 'Revise os campos em vermelho antes de continuar.',
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                        ],
-
-                        // Campo 1: Nome da avaliação
-                        _CampoTextoRotulado(
-                          label: 'Nome da avaliação',
-                          controller: _nomeController,
-                          hintText: 'Digite um nome',
-                          temErro: _erroNome,
-                          mensagemErro: 'Este campo é obrigatório',
-                          onChanged: (_) {
-                            if (_erroNome) {
-                              setState(() => _erroNome = false);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        // Campo 2: Disciplina
-                        _CampoTextoRotulado(
-                          label: 'Disciplina',
-                          controller: _disciplinaController,
-                          hintText: 'Engenharia de Software',
-                          temErro: _erroDisciplina,
-                          mensagemErro: 'Este campo é obrigatório',
-                          onChanged: (_) {
-                            if (_erroDisciplina) {
-                              setState(() => _erroDisciplina = false);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        // Campo 3: Turma
-                        _SeletorTurma(
-                          label: 'Turma',
-                          valorSelecionado: _turmaSelecionada,
-                          temErro: _erroTurma,
-                          mensagemErro: 'Este campo é obrigatório',
-                          onTap: _abrirSeletorTurma,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        // Linha com Data e Questões
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  SurfaceCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(
-                              flex: 3,
-                              child: _CampoData(
-                                label: 'Data',
-                                controller: _dataController,
-                                temErro: _erroData,
-                                mensagemErro: 'Obrigatório',
-                                onTap: _selecionarData,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              flex: 2,
-                              child: _CampoNumero(
-                                label: 'Questões',
-                                controller: _questoesController,
-                                temErro: _erroQuestoes,
-                                mensagemErro: 'Inválido',
-                                onChanged: (_) {
-                                  if (_erroQuestoes) {
-                                    setState(() => _erroQuestoes = false);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-
-                        // Alternativas por questão
-                        const Text(
-                          'Alternativas por questão',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        _SeletorAlternativas(
-                          valorSelecionado: _numAlternativas,
-                          onSelect: (val) =>
-                              setState(() => _numAlternativas = val),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        // Botão Criar avaliação
-                        ElevatedButton(
-                          onPressed: _aoClicarCriar,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Criar avaliação',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: 1,
-        onTap: (index) {
-          if (widget.onNavigateTab != null) {
-            widget.onNavigateTab!(index);
-          } else {
-            if (index == 1) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(index == 0 ? 'Home' : 'Histórico'),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          }
-        },
-      ),
-    );
-  }
+                        const Eyebrow('Informações básicas'),
+                        const FormLabel('Nome da avaliação'),
+                        TextFormField(
+                            controller: _nome,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                                hintText: 'Ex.: Fundamentos de software'),
+                            validator: obrigatorio),
+                        const FormLabel('Disciplina'),
+                        TextFormField(
+                            controller: _disciplina,
+                            decoration: const InputDecoration(
+                                hintText: 'Ex.: Engenharia de Software'),
+                            validator: obrigatorio),
+                        const FormLabel('Turma'),
+                        DropdownButtonFormField<String>(
+                            initialValue: _turma,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                                hintText: 'Selecione uma turma',
+                                helperText: _temCorrecoes
+                                    ? 'Turma preservada após a primeira correção.'
+                                    : null),
+                            items: SessionScope.of(context)
+                                .turmas
+                                .map((t) =>
+                                    DropdownMenuItem(value: t, child: Text(t)))
+                                .toList(),
+                            onChanged: _temCorrecoes
+                                ? null
+                                : (v) => setState(() => _turma = v),
+                            validator: (v) =>
+                                v == null ? 'Selecione uma turma.' : null)
+                      ])),
+                  const SizedBox(height: 16),
+                  SurfaceCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                        const Eyebrow('Formato da folha'),
+                        const FormLabel('Quantidade de questões'),
+                        TextFormField(
+                            controller: _quantidade,
+                            enabled: !_edicao,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                                hintText: 'De 1 a 60', suffixText: 'questões'),
+                            validator: (v) {
+                              final n = int.tryParse(v ?? '');
+                              return n == null || n < 1 || n > 60
+                                  ? 'Informe de 1 a 60 questões.'
+                                  : null;
+                            }),
+                        const FormLabel('Alternativas por questão'),
+                        Wrap(spacing: 8, children: [
+                          for (final n in [2, 3, 4, 5])
+                            ChoiceChip(
+                                label: Text('$n'),
+                                selected: _alternativas == n,
+                                showCheckmark: false,
+                                onSelected: _edicao
+                                    ? null
+                                    : (_) => setState(() => _alternativas = n))
+                        ]),
+                        const SizedBox(height: 12),
+                        Text(
+                            _edicao
+                                ? 'O formato é preservado para manter o gabarito e as correções consistentes.'
+                                : 'Todas as questões usam o mesmo número de alternativas.',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.textMuted))
+                      ])),
+                  const SizedBox(height: 16),
+                  SurfaceCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                        const Eyebrow('Planejamento · opcional'),
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                            onPressed: _selecionarData,
+                            icon: const Icon(Icons.calendar_month_outlined,
+                                size: 20),
+                            label: Text(_data == null
+                                ? 'Escolher data'
+                                : '${_data!.day.toString().padLeft(2, '0')}/${_data!.month.toString().padLeft(2, '0')}/${_data!.year}')),
+                        if (_data != null) ...[
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                              onPressed: () async {
+                                final hora = await showTimePicker(
+                                    context: context,
+                                    initialTime: _hora,
+                                    builder: (c, child) => MediaQuery(
+                                        data: MediaQuery.of(c).copyWith(
+                                            alwaysUse24HourFormat: true),
+                                        child: child!));
+                                if (mounted && hora != null) {
+                                  setState(() => _hora = hora);
+                                }
+                              },
+                              icon:
+                                  const Icon(Icons.schedule_rounded, size: 20),
+                              label: Text(
+                                  '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}')),
+                          TextButton(
+                              onPressed: () => setState(() => _data = null),
+                              child: const Text('Remover data'))
+                        ]
+                      ])),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                      onPressed: _salvar,
+                      child: Text(
+                          _edicao ? 'Salvar alterações' : 'Criar avaliação')),
+                  const SizedBox(height: 12),
+                  const InfoBanner(
+                      'As informações ficam disponíveis apenas durante esta sessão de demonstração.'),
+                ])),
+      ]));
 }
 
-// Banner de alerta
-class _BannerAlertaValidacao extends StatelessWidget {
-  final String mensagem;
-
-  const _BannerAlertaValidacao({required this.mensagem});
-
+class SucessoAvaliacaoScreen extends StatelessWidget {
+  final String avaliacaoId;
+  const SucessoAvaliacaoScreen({super.key, required this.avaliacaoId});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: const Color(0x33DC2626)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: const BoxDecoration(
-              color: AppColors.dangerFg,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text(
-                '!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                  height: 1.1,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              mensagem,
-              style: const TextStyle(
-                color: AppColors.dangerFg,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Campo de texto
-class _CampoTextoRotulado extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String hintText;
-  final bool temErro;
-  final String mensagemErro;
-  final ValueChanged<String>? onChanged;
-
-  const _CampoTextoRotulado({
-    required this.label,
-    required this.controller,
-    required this.hintText,
-    required this.temErro,
-    required this.mensagemErro,
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          onChanged: onChanged,
-          style: const TextStyle(
-            fontSize: 15,
-            color: AppColors.textPrimary,
-          ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            filled: true,
-            fillColor: AppColors.surface,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              borderSide: BorderSide(
-                color: temErro ? AppColors.dangerFg : AppColors.inputBorder,
-                width: temErro ? 1.5 : 1.0,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              borderSide: BorderSide(
-                color: temErro ? AppColors.dangerFg : AppColors.deepNavy,
-                width: 1.5,
-              ),
-            ),
-          ),
-        ),
-        if (temErro) ...[
-          const SizedBox(height: 4),
-          Text(
-            mensagemErro,
-            style: const TextStyle(
-              color: AppColors.dangerFg,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-// Seletor de turma
-class _SeletorTurma extends StatelessWidget {
-  final String label;
-  final String? valorSelecionado;
-  final bool temErro;
-  final String mensagemErro;
-  final VoidCallback onTap;
-
-  const _SeletorTurma({
-    required this.label,
-    required this.valorSelecionado,
-    required this.temErro,
-    required this.mensagemErro,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final temValor = valorSelecionado != null && valorSelecionado!.isNotEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(
-                color: temErro ? AppColors.dangerFg : AppColors.inputBorder,
-                width: temErro ? 1.5 : 1.0,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  temValor ? valorSelecionado! : 'Selecione uma turma',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: temErro
-                        ? AppColors.dangerFg
-                        : (temValor
-                            ? AppColors.textPrimary
-                            : AppColors.textMuted),
-                    fontWeight: temErro ? FontWeight.w500 : FontWeight.normal,
-                  ),
-                ),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  color:
-                      temErro ? AppColors.dangerFg : AppColors.deepNavy,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (temErro) ...[
-          const SizedBox(height: 4),
-          Text(
-            mensagemErro,
-            style: const TextStyle(
-              color: AppColors.dangerFg,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-// Campo de data
-class _CampoData extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final bool temErro;
-  final String mensagemErro;
-  final VoidCallback onTap;
-
-  const _CampoData({
-    required this.label,
-    required this.controller,
-    required this.temErro,
-    required this.mensagemErro,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(
-                color: temErro ? AppColors.dangerFg : AppColors.inputBorder,
-                width: temErro ? 1.5 : 1.0,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    controller.text.isEmpty ? 'DD/MM/AAAA' : controller.text,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: controller.text.isEmpty
-                          ? AppColors.textMuted
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 18,
-                  color: AppColors.deepNavy,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (temErro) ...[
-          const SizedBox(height: 4),
-          Text(
-            mensagemErro,
-            style: const TextStyle(
-              color: AppColors.dangerFg,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-// Campo numérico
-class _CampoNumero extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final bool temErro;
-  final String mensagemErro;
-  final ValueChanged<String>? onChanged;
-
-  const _CampoNumero({
-    required this.label,
-    required this.controller,
-    required this.temErro,
-    required this.mensagemErro,
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          onChanged: onChanged,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: AppColors.surface,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              borderSide: BorderSide(
-                color: temErro ? AppColors.dangerFg : AppColors.inputBorder,
-                width: temErro ? 1.5 : 1.0,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              borderSide: BorderSide(
-                color: temErro ? AppColors.dangerFg : AppColors.deepNavy,
-                width: 1.5,
-              ),
-            ),
-          ),
-        ),
-        if (temErro) ...[
-          const SizedBox(height: 4),
-          Text(
-            mensagemErro,
-            style: const TextStyle(
-              color: AppColors.dangerFg,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-// Seletor de alternativas
-class _SeletorAlternativas extends StatelessWidget {
-  final int valorSelecionado;
-  final ValueChanged<int> onSelect;
-
-  const _SeletorAlternativas({
-    required this.valorSelecionado,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [4, 5, 6].map((qtd) {
-        final selecionado = qtd == valorSelecionado;
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: qtd == 4 ? 0 : 6,
-              right: qtd == 6 ? 0 : 6,
-            ),
-            child: InkWell(
-              onTap: () => onSelect(qtd),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                height: 44,
-                decoration: BoxDecoration(
-                  color: selecionado ? AppColors.deepNavy : AppColors.surface,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(
-                    color: selecionado
-                        ? AppColors.deepNavy
-                        : AppColors.inputBorder,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    '$qtd',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: selecionado ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
+    final a = SessionScope.of(context).avaliacao(avaliacaoId);
+    return AppPage(
+        title: 'Avaliação criada',
+        child: ListView(padding: const EdgeInsets.all(24), children: [
+          const SizedBox(height: 20),
+          const EmptyState(
+              title: 'Avaliação criada',
+              subtitle: 'Defina o gabarito de referência para a correção.',
+              icon: Icons.check_rounded),
+          SurfaceCard(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                const Eyebrow('Sua avaliação'),
+                const SizedBox(height: 12),
+                Text(a.nome, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text('${a.disciplina}\n${a.turma} · ${a.numQuestoes} questões')
+              ])),
+          const SizedBox(height: 24),
+          ElevatedButton(
+              onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => GabaritoScreen(
+                          avaliacaoId: a.id, abrirDetalhesAoSalvar: true))),
+              child: const Text('Preparar gabarito')),
+          const SizedBox(height: 12),
+          OutlinedButton(
+              onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          DetalhesAvaliacaoScreen(avaliacaoId: a.id))),
+              child: const Text('Ver avaliação'))
+        ]));
   }
 }

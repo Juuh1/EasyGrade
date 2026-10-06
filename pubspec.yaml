@@ -2,7 +2,7 @@ name: easy_grade
 description: >
   App de correção automatizada de provas
 publish_to: 'none'
-version: 0.1.0
+version: 0.2.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -10,7 +10,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  intl: ^0.19.0
+  flutter_localizations:
+    sdk: flutter
+  flutter_svg: ^2.2.4
+  vector_graphics: ^1.2.3
+  intl: ^0.20.2
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
@@ -20,3 +24,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - SVG/
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope.ttf

@@ -1,107 +1,69 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-// Barra de navegação inferior
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
-
-  const AppBottomNav({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
-
+  const AppBottomNav(
+      {super.key, required this.currentIndex, required this.onTap});
   @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget build(BuildContext context) => Container(
       decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.border))),
       child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home,
-              label: 'Home',
-              isSelected: currentIndex == 0,
-              onTap: () => onTap(0),
-            ),
-            _NavItem(
-              icon: Icons.add_circle_outline,
-              activeIcon: Icons.add_circle,
-              label: 'Criar',
-              isSelected: currentIndex == 1,
-              onTap: () => onTap(1),
-            ),
-            _NavItem(
-              icon: Icons.history,
-              activeIcon: Icons.history,
-              label: 'Histórico',
-              isSelected: currentIndex == 2,
-              onTap: () => onTap(2),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.pillActiveBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : icon,
-              size: 22,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+          top: false,
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Row(
+                  children: List.generate(4, (i) {
+                const labels = ['Início', 'Avaliações', 'Leitura', 'Perfil'];
+                const icons = [
+                  Icons.grid_view_rounded,
+                  Icons.assignment_outlined,
+                  Icons.document_scanner_outlined,
+                  Icons.person_outline_rounded
+                ];
+                final active = i == currentIndex;
+                return Expanded(
+                    child: Semantics(
+                        selected: active,
+                        button: true,
+                        child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () => onTap(i),
+                            child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 7),
+                                child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 180),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 18, vertical: 5),
+                                          decoration: BoxDecoration(
+                                              color: active
+                                                  ? AppColors.lavender
+                                                  : Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                          child: Icon(icons[i],
+                                              size: 22,
+                                              color: active
+                                                  ? AppColors.primaryDark
+                                                  : AppColors.textMuted)),
+                                      const SizedBox(height: 4),
+                                      Text(labels[i],
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: active
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w500,
+                                              color: active
+                                                  ? AppColors.primaryDark
+                                                  : AppColors.textMuted))
+                                    ])))));
+              })))));
 }

@@ -1,83 +1,107 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-
-import 'screens/criar_avaliacao_screen.dart';
-import 'screens/historico_screen.dart';
-import 'screens/login_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'data/session_store.dart';
+import 'screens/auth_screens.dart';
 import 'screens/home_screen.dart';
+import 'screens/historico_screen.dart';
+import 'screens/leitura_screen.dart';
 import 'screens/perfil_screen.dart';
+import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
+import 'widgets/app_bottom_nav.dart';
 
-void main() {
-  runApp(const N1App());
+void main() => runApp(const N1App());
+
+class N1App extends StatefulWidget {
+  final SessionStore? store;
+  const N1App({super.key, this.store});
+  @override
+  State<N1App> createState() => _N1AppState();
 }
 
-class N1App extends StatelessWidget {
-  const N1App({super.key});
+class _N1AppState extends State<N1App> {
+  late final SessionStore _store = widget.store ?? SessionStore();
+  @override
+  void dispose() {
+    if (widget.store == null) _store.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Correção de Provas — Católica SC',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const AuthenticationGate(),
-    );
-  }
+  Widget build(BuildContext context) => SessionScope(
+      store: _store,
+      child: MaterialApp(
+        title: 'EasyGrade',
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(),
+        locale: const Locale('pt', 'BR'),
+        supportedLocales: const [Locale('pt', 'BR')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          final store = SessionScope.of(context);
+          return Container(
+              color: AppColors.pageBackground,
+              alignment: Alignment.center,
+              child: Container(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  decoration: const BoxDecoration(boxShadow: [
+                    BoxShadow(color: Color(0x16342047), blurRadius: 40)
+                  ]),
+                  child: MediaQuery(
+                      data: media.copyWith(
+                          size: Size(math.min(600, media.size.width),
+                              media.size.height),
+                          disableAnimations: store.reduzirMovimento ||
+                              media.disableAnimations),
+                      child: child!)));
+        },
+        home: const AuthenticationGate(),
+      ));
 }
 
 class AuthenticationGate extends StatefulWidget {
   const AuthenticationGate({super.key});
-
   @override
   State<AuthenticationGate> createState() => _AuthenticationGateState();
 }
 
 class _AuthenticationGateState extends State<AuthenticationGate> {
-  bool _autenticado = false;
-
+  bool _abriu = false, _autenticado = false;
   @override
   Widget build(BuildContext context) {
-    if (_autenticado) return const MainNavigationShell();
-    return LoginScreen(onLogin: () => setState(() => _autenticado = true));
+    if (!_abriu) {
+      return SplashScreen(onComplete: () => setState(() => _abriu = true));
+    }
+    if (!_autenticado) {
+      return LoginScreen(onLogin: () => setState(() => _autenticado = true));
+    }
+    return MainNavigationShell(
+        onLogout: () => setState(() => _autenticado = false));
   }
 }
 
-// Navegação principal
 class MainNavigationShell extends StatefulWidget {
   final int initialIndex;
-
-  const MainNavigationShell({super.key, this.initialIndex = 0});
-
+  final VoidCallback onLogout;
+  const MainNavigationShell(
+      {super.key, this.initialIndex = 0, required this.onLogout});
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
-  late int _currentIndex;
-
+  late int _index = widget.initialIndex;
+  void _navigate(int i) => setState(() => _index = i);
   @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-  }
-
-  void _onTabChanged(int index) {
-    setState(() => _currentIndex = index);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    switch (_currentIndex) {
-      case 0:
-        return HomePage(onNavigateTab: _onTabChanged);
-      case 1:
-        return CriarAvaliacaoScreen(onNavigateTab: _onTabChanged);
-      case 2:
-        return HistoricoScreen(onNavigateTab: _onTabChanged);
-      case 3:
-        return PerfilScreen(onNavigateTab: _onTabChanged);
-      default:
-        return CriarAvaliacaoScreen(onNavigateTab: _onTabChanged);
-    }
-  }
+  Widget build(BuildContext context) => Scaffold(
+      body: IndexedStack(index: _index, children: [
+        HomePage(onNavigateTab: _navigate),
+        const HistoricoScreen(),
+        const SelecionarLeituraScreen(),
+        PerfilScreen(onLogout: widget.onLogout)
+      ]),
+      bottomNavigationBar:
+          AppBottomNav(currentIndex: _index, onTap: _navigate));
 }

@@ -1,225 +1,258 @@
 import 'package:flutter/material.dart';
-
+import '../data/session_store.dart';
 import '../theme/app_theme.dart';
-import 'configuracoes_screen.dart';
-import 'editar_usuario_screen.dart';
+import '../widgets/app_ui.dart';
+import 'auth_screens.dart';
+import 'apoio_screens.dart';
+import 'splash_screen.dart';
 
-class PerfilScreen extends StatefulWidget {
-  final ValueChanged<int> onNavigateTab;
-
-  const PerfilScreen({super.key, required this.onNavigateTab});
-
-  @override
-  State<PerfilScreen> createState() => _PerfilScreenState();
-}
-
-class _PerfilScreenState extends State<PerfilScreen> {
-  String _nome = 'User';
-  String _email = 'user@easygrade.app';
-  String _instituicao = 'Católica de Santa Catarina';
-
-  Future<void> _editarUsuario() async {
-    final dadosAtualizados = await Navigator.of(context).push<UsuarioFormData>(
-      MaterialPageRoute(
-        builder: (_) => EditarUsuarioScreen(
-          dadosIniciais: UsuarioFormData(
-            nome: _nome,
-            email: _email,
-            instituicao: _instituicao,
-          ),
-        ),
-      ),
-    );
-
-    if (!mounted || dadosAtualizados == null) return;
-    setState(() {
-      _nome = dadosAtualizados.nome;
-      _email = dadosAtualizados.email;
-      _instituicao = dadosAtualizados.instituicao;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Perfil atualizado localmente.')),
-    );
-  }
-
+class PerfilScreen extends StatelessWidget {
+  final VoidCallback onLogout;
+  const PerfilScreen({super.key, required this.onLogout});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Meu perfil'),
-        leading: IconButton(
-          tooltip: 'Voltar',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              widget.onNavigateTab(0);
-            }
-          },
-        ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            _ProfileHeader(nome: _nome, email: _email),
-            const SizedBox(height: AppSpacing.lg),
-            _InfoCard(
-              title: 'Dados do usuário',
-              children: [
-                _InfoRow(
-                    icon: Icons.person_outline, label: 'Nome', value: _nome),
-                const Divider(height: 24),
-                _InfoRow(
-                    icon: Icons.email_outlined, label: 'E-mail', value: _email),
-                const Divider(height: 24),
-                _InfoRow(
-                  icon: Icons.school_outlined,
-                  label: 'Instituição',
-                  value: _instituicao,
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            ElevatedButton.icon(
-              onPressed: _editarUsuario,
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Editar usuário'),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Funcionalidade disponível sem backend.')),
-              ),
-              icon: const Icon(Icons.lock_outline),
-              label: const Text('Alterar senha'),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const ConfiguracoesScreen()),
-                );
-              },
-              icon: const Icon(Icons.settings_outlined),
-              label: const Text('Sobre e configurações'),
-            ),
-          ],
-        ),
-      ),
-    );
+    final store = SessionScope.of(context);
+    return AppPage(
+        title: 'Perfil',
+        root: true,
+        child: ListView(padding: const EdgeInsets.all(24), children: [
+          const PageHeading(title: 'Meu perfil'),
+          SurfaceCard(
+              color: AppColors.softPurple,
+              child: Row(children: [
+                CircleAvatar(
+                    radius: 31,
+                    backgroundColor: AppColors.lavender,
+                    child: Text(store.nome[0].toUpperCase(),
+                        style: const TextStyle(
+                            color: AppColors.primaryDark,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800))),
+                const SizedBox(width: 18),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(store.nome,
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 4),
+                      Text(store.email, style: const TextStyle(fontSize: 12)),
+                      const SizedBox(height: 6),
+                      Text(store.instituicao,
+                          style: const TextStyle(fontSize: 11))
+                    ]))
+              ])),
+          const SectionHeading('Sua conta'),
+          ActionTile(
+              icon: Icons.edit_outlined,
+              title: 'Editar perfil',
+              subtitle: 'Nome, e-mail e instituição.',
+              onTap: () => abrir(context, const EditarUsuarioScreen())),
+          ActionTile(
+              icon: Icons.lock_outline_rounded,
+              title: 'Alterar senha',
+              subtitle: 'Veja o fluxo de atualização de acesso.',
+              onTap: () => abrir(context, const AlterarSenhaScreen())),
+          const SectionHeading('Preferências e ajuda'),
+          ActionTile(
+              icon: Icons.tune_rounded,
+              title: 'Configurações',
+              subtitle: 'Movimento, abertura e informações do app.',
+              onTap: () => abrir(context, const ConfiguracoesScreen())),
+          ActionTile(
+              icon: Icons.help_outline_rounded,
+              title: 'Como funciona',
+              subtitle: 'Conheça o caminho da prova física ao resultado.',
+              onTap: () => abrir(context, const AjudaScreen())),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+              onPressed: onLogout,
+              icon: const Icon(Icons.logout_rounded, size: 19),
+              label: const Text('Sair da conta')),
+          const SizedBox(height: 20),
+          const Center(
+              child: Text('EasyGrade · N1 · versão 0.2.0',
+                  style: TextStyle(fontSize: 10, color: AppColors.textMuted)))
+        ]));
   }
 }
 
-class _ProfileHeader extends StatelessWidget {
-  final String nome;
-  final String email;
-
-  const _ProfileHeader({required this.nome, required this.email});
-
+class EditarUsuarioScreen extends StatefulWidget {
+  const EditarUsuarioScreen({super.key});
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 46,
-          backgroundColor: AppColors.pillActiveBg,
-          child: Text(
-            _iniciais(nome),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          nome,
-          style: Theme.of(context)
-              .textTheme
-              .headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(email, style: const TextStyle(color: AppColors.textSecondary)),
-      ],
-    );
-  }
-
-  String _iniciais(String texto) {
-    final partes = texto.trim().split(RegExp(r'\s+'));
-    if (partes.isEmpty || partes.first.isEmpty) return '?';
-    if (partes.length == 1) return partes.first.substring(0, 1).toUpperCase();
-    return '${partes.first[0]}${partes.last[0]}'.toUpperCase();
-  }
+  State<EditarUsuarioScreen> createState() => _EditarUsuarioScreenState();
 }
 
-class _InfoCard extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-
-  const _InfoCard({required this.title, required this.children});
+class _EditarUsuarioScreenState extends State<EditarUsuarioScreen> {
+  final _form = GlobalKey<FormState>();
+  final _nome = TextEditingController(),
+      _email = TextEditingController(),
+      _instituicao = TextEditingController();
+  bool _loaded = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loaded) {
+      _loaded = true;
+      final store = SessionScope.of(context);
+      _nome.text = store.nome;
+      _email.text = store.email;
+      _instituicao.text = store.instituicao;
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            const SizedBox(height: AppSpacing.md),
-            ...children,
-          ],
-        ),
-      ),
-    );
+  void dispose() {
+    _nome.dispose();
+    _email.dispose();
+    _instituicao.dispose();
+    super.dispose();
   }
+
+  @override
+  Widget build(BuildContext context) => AppPage(
+      title: 'Editar perfil',
+      child: ListView(padding: const EdgeInsets.all(24), children: [
+        const PageHeading(
+            title: 'Editar perfil',
+            subtitle: 'As alterações aparecem em todas as telas nesta sessão.'),
+        Form(
+            key: _form,
+            child: Column(children: [
+              TextFormField(
+                  controller: _nome,
+                  decoration: const InputDecoration(labelText: 'Nome'),
+                  validator: obrigatorio),
+              const SizedBox(height: 16),
+              TextFormField(
+                  controller: _email,
+                  decoration: const InputDecoration(labelText: 'E-mail'),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: validarEmail),
+              const SizedBox(height: 16),
+              TextFormField(
+                  controller: _instituicao,
+                  decoration: const InputDecoration(labelText: 'Instituição'),
+                  validator: obrigatorio)
+            ])),
+        const SizedBox(height: 24),
+        ElevatedButton(
+            onPressed: () {
+              if (!_form.currentState!.validate()) return;
+              SessionScope.of(context).atualizarPerfil(_nome.text.trim(),
+                  _email.text.trim(), _instituicao.text.trim());
+              Navigator.pop(context);
+              avisar(context, 'Perfil atualizado nesta sessão.');
+            },
+            child: const Text('Salvar alterações'))
+      ]));
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
+class AlterarSenhaScreen extends StatefulWidget {
+  const AlterarSenhaScreen({super.key});
+  @override
+  State<AlterarSenhaScreen> createState() => _AlterarSenhaScreenState();
+}
 
-  const _InfoRow(
-      {required this.icon, required this.label, required this.value});
+class _AlterarSenhaScreenState extends State<AlterarSenhaScreen> {
+  final _form = GlobalKey<FormState>();
+  final _senha = TextEditingController();
+  @override
+  void dispose() {
+    _senha.dispose();
+    super.dispose();
+  }
 
   @override
+  Widget build(BuildContext context) => AppPage(
+      title: 'Alterar senha',
+      child: ListView(padding: const EdgeInsets.all(24), children: [
+        const PageHeading(
+            title: 'Alterar senha',
+            subtitle: 'Experimente a validação de uma nova senha.'),
+        Form(
+            key: _form,
+            child: Column(children: [
+              TextFormField(
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                      labelText: 'Senha atual de demonstração'),
+                  validator: (v) =>
+                      v != 'User' ? 'A senha de demonstração é User.' : null),
+              const SizedBox(height: 16),
+              TextFormField(
+                  controller: _senha,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Nova senha'),
+                  validator: (v) => (v?.length ?? 0) < 6
+                      ? 'Use pelo menos 6 caracteres.'
+                      : null),
+              const SizedBox(height: 16),
+              TextFormField(
+                  obscureText: true,
+                  decoration:
+                      const InputDecoration(labelText: 'Confirmar nova senha'),
+                  validator: (v) =>
+                      v != _senha.text ? 'As senhas devem ser iguais.' : null)
+            ])),
+        const SizedBox(height: 20),
+        const InfoBanner(
+            'A mudança de senha é simulada. Para entrar novamente na N1, use User / User.'),
+        const SizedBox(height: 24),
+        ElevatedButton(
+            onPressed: () {
+              if (!_form.currentState!.validate()) return;
+              Navigator.pop(context);
+              avisar(context,
+                  'Fluxo de alteração validado. A senha de acesso continua User.');
+            },
+            child: const Text('Simular alteração de senha'))
+      ]));
+}
+
+class ConfiguracoesScreen extends StatelessWidget {
+  const ConfiguracoesScreen({super.key});
+  @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: AppColors.primary),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
-              const SizedBox(height: 2),
-              Text(value,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ],
-    );
+    final store = SessionScope.of(context);
+    return AppPage(
+        title: 'Configurações',
+        child: ListView(padding: const EdgeInsets.all(24), children: [
+          const PageHeading(title: 'Configurações'),
+          SurfaceCard(
+              child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Reduzir movimento',
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  subtitle: const Text(
+                      'Pule a animação de abertura. A preferência de acessibilidade do aparelho também é respeitada.',
+                      style: TextStyle(fontSize: 12)),
+                  value: store.reduzirMovimento,
+                  onChanged: store.movimento)),
+          const SizedBox(height: 16),
+          ActionTile(
+              icon: Icons.play_circle_outline_rounded,
+              title: 'Rever animação de abertura',
+              subtitle: 'Uma folha de respostas se transforma na marca.',
+              onTap: () => abrir(context,
+                  SplashScreen(onComplete: () => Navigator.pop(context)))),
+          const SectionHeading('Sobre o EasyGrade'),
+          const SurfaceCard(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Brand(size: 34),
+                SizedBox(height: 20),
+                Text(
+                    'Protótipo acadêmico de correção de avaliações objetivas em papel. Preparação, leitura demonstrativa e análise pedagógica em um só fluxo.',
+                    style: TextStyle(fontSize: 12)),
+                SizedBox(height: 20),
+                Eyebrow('N1 · Versão 0.2.0'),
+                SizedBox(height: 12),
+                InfoBanner(
+                    'Dados locais de demonstração, sem persistência. A integração com banco de dados pertence à N2 e não está presente nesta versão.')
+              ]))
+        ]));
   }
 }
