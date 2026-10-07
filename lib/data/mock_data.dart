@@ -11,6 +11,7 @@ import '../models/status_avaliacao.dart';
 class MockData {
   MockData._();
 
+<<<<<<< Updated upstream
   static final List<Avaliacao> avaliacoes = [
     Avaliacao(
       id: '1',
@@ -62,4 +63,18 @@ class MockData {
   /// dropdown "Turma" do modal de Filtros.
   static List<String> get turmas =>
       avaliacoes.map((a) => a.turma).toSet().toList()..sort();
+=======
+  /// Lista de avaliações mock removida (N1 -> dados reais / Firestore).
+  /// Mantida tipada como List<Avaliacao> para não quebrar o restante do
+  /// app; passará a ser alimentada por dados reais na próxima etapa.
+  static List<Avaliacao> get avaliacoes => <Avaliacao>[];
+
+  /// Dados mock de apoio (disciplinas, turmas, alunos e banco de questões)
+  /// também removidos (N1 -> dados reais / Firestore). Mantidos tipados
+  /// para não quebrar o restante do app.
+  static const disciplinas = <String>[];
+  static const turmas = <String>[];
+  static const alunos = <Aluno>[];
+  static const questoes = <Questao>[];
+>>>>>>> Stashed changes
 }
