@@ -1,35 +1,69 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// Barra inferior reaproveitada nas telas deste módulo. As abas "Home" e
-/// "Criar" são responsabilidade de outros membros do grupo — aqui elas
-/// aparecem apenas como destino de navegação (placeholder) para manter a
-/// experiência coerente com o restante do app mockado no Figma.
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
-
-  const AppBottomNav({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
-
+  const AppBottomNav(
+      {super.key, required this.currentIndex, required this.onTap});
   @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: AppColors.primary,
-      unselectedItemColor: AppColors.textSecondary,
-      backgroundColor: AppColors.surface,
-      selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: 'Criar'),
-        BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Histórico'),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Container(
+      decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.border))),
+      child: SafeArea(
+          top: false,
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Row(
+                  children: List.generate(4, (i) {
+                const labels = ['Início', 'Avaliações', 'Leitura', 'Perfil'];
+                const icons = [
+                  Icons.grid_view_rounded,
+                  Icons.assignment_outlined,
+                  Icons.document_scanner_outlined,
+                  Icons.person_outline_rounded
+                ];
+                final active = i == currentIndex;
+                return Expanded(
+                    child: Semantics(
+                        selected: active,
+                        button: true,
+                        child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () => onTap(i),
+                            child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 7),
+                                child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 180),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 18, vertical: 5),
+                                          decoration: BoxDecoration(
+                                              color: active
+                                                  ? AppColors.lavender
+                                                  : Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                          child: Icon(icons[i],
+                                              size: 22,
+                                              color: active
+                                                  ? AppColors.primaryDark
+                                                  : AppColors.textMuted)),
+                                      const SizedBox(height: 4),
+                                      Text(labels[i],
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: active
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w500,
+                                              color: active
+                                                  ? AppColors.primaryDark
+                                                  : AppColors.textMuted))
+                                    ])))));
+              })))));
 }

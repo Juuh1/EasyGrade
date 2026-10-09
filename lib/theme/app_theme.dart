@@ -1,149 +1,182 @@
 import 'package:flutter/material.dart';
 
-/// Paleta e constantes de estilo extraídas do mockup do Figma
-/// (tela "Histórico" / "Detalhes da Avaliação" / modal "Filtros").
 class AppColors {
   AppColors._();
-
-  // Cor principal (header, botões primários, elementos ativos)
-  static const Color primary = Color(0xFF8B1D3F);
-  static const Color primaryDark = Color(0xFF6E1732);
-
-  // Fundo
-  static const Color background = Color(0xFFF5F5F7);
-  static const Color surface = Colors.white;
-
-  // Texto
-  static const Color textPrimary = Color(0xFF1F2023);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textMuted = Color(0xFF9CA3AF);
-
-  // Bordas / divisores
-  static const Color border = Color(0xFFE5E7EB);
-  static const Color inputBorder = Color(0xFFD1D5DB);
-
-  // Badges de status (fundo + texto)
-  static const Color concluidaBg = Color(0xFFDCFCE7);
-  static const Color concluidaFg = Color(0xFF16A34A);
-
-  static const Color agendadaBg = Color(0xFFFDEBD3);
-  static const Color agendadaFg = Color(0xFFB45309);
-
-  static const Color rascunhoBg = Color(0xFFEEEFF1);
-  static const Color rascunhoFg = Color(0xFF6B7280);
-
-  // Alerta (usado em validações de formulário em outras telas do app)
-  static const Color dangerBg = Color(0xFFFCE8E8);
-  static const Color dangerFg = Color(0xFFDC2626);
+  static const primary = Color(0xFF7952B9);
+  static const primaryDark = Color(0xFF342047);
+  static const lavender = Color(0xFFB79AD8);
+  static const softPurple = Color(0xFFF0EAF8);
+  static const background = Color(0xFFF8F6FA);
+  static const pageBackground = Color(0xFFEEE8F4);
+  static const surface = Colors.white;
+  static const textPrimary = primaryDark;
+  static const textSecondary = Color(0xFF766781);
+  static const textMuted = Color(0xFF7A6A87);
+  static const onDarkSecondary = Color(0xFFD8CDE4);
+  static const darkBorder = Color(0xFF583B70);
+  static const border = Color(0xFFE7DFEE);
+  static const inputBorder = border;
+  static const concluidaBg = softPurple;
+  static const concluidaFg = primary;
+  static const agendadaBg = Color(0xFFFFF2D9);
+  static const agendadaFg = Color(0xFF91621C);
+  static const rascunhoBg = Color(0xFFF2EFF5);
+  static const rascunhoFg = textSecondary;
+  static const dangerBg = Color(0xFFFFEEEA);
+  static const dangerFg = Color(0xFFB95443);
+  static const pillActiveBg = softPurple;
 }
 
 class AppRadius {
   AppRadius._();
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double pill = 999;
+  static const double sm = 12, md = 18, lg = 26, pill = 999;
 }
 
 class AppSpacing {
   AppSpacing._();
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 16;
-  static const double lg = 24;
-  static const double xl = 32;
+  static const double xs = 4, sm = 8, md = 16, lg = 24, xl = 32;
 }
 
-/// Larguras usadas para tornar as telas responsivas: em telas largas
-/// (tablet / web / desktop) o conteúdo é centralizado com uma largura
-/// máxima, em vez de esticar até a borda.
 class AppBreakpoints {
   AppBreakpoints._();
-  static const double compact = 600; // celular
-  static const double medium = 1024; // tablet
-  static const double maxContentWidth = 480; // largura "mobile" de referência
+  static const double compact = 600, medium = 1024, maxContentWidth = 600;
 }
 
 ThemeData buildAppTheme() {
   final base = ThemeData(
     useMaterial3: true,
+    fontFamily: 'Manrope',
+    scaffoldBackgroundColor: AppColors.background,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       primary: AppColors.primary,
+      secondary: AppColors.lavender,
       surface: AppColors.surface,
+      error: AppColors.dangerFg,
     ),
-    scaffoldBackgroundColor: AppColors.background,
-    fontFamily: 'Roboto',
   );
-
+  final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(16));
   return base.copyWith(
+    textTheme: base.textTheme
+        .apply(
+            bodyColor: AppColors.textPrimary,
+            displayColor: AppColors.textPrimary)
+        .copyWith(
+          headlineLarge: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1.2,
+              height: 1.2,
+              color: AppColors.textPrimary),
+          headlineMedium: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1,
+              color: AppColors.textPrimary),
+          titleLarge: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.5,
+              color: AppColors.textPrimary),
+          titleMedium: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary),
+          bodyMedium: const TextStyle(
+              fontFamily: 'Manrope',
+              fontSize: 14,
+              height: 1.6,
+              color: AppColors.textSecondary),
+        ),
     appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.primary,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: false,
-      titleTextStyle: TextStyle(
-        color: Colors.white,
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-    textTheme: base.textTheme.apply(
-      bodyColor: AppColors.textPrimary,
-      displayColor: AppColors.textPrimary,
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-      ),
-    ),
+        toolbarHeight: 68,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+            fontFamily: 'Manrope',
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary)),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryDark,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(0, 54),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            elevation: 0,
+            shape: shape,
+            textStyle: const TextStyle(
+                fontFamily: 'Manrope',
+                fontSize: 14,
+                fontWeight: FontWeight.w700))),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        side: const BorderSide(color: AppColors.inputBorder),
-        minimumSize: const Size.fromHeight(52),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-        ),
-        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      ),
-    ),
+        style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primaryDark,
+            minimumSize: const Size(0, 52),
+            side: const BorderSide(color: AppColors.border),
+            shape: shape,
+            textStyle: const TextStyle(
+                fontFamily: 'Manrope',
+                fontSize: 14,
+                fontWeight: FontWeight.w700))),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        foregroundColor: AppColors.primary,
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-      ),
-    ),
+        style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            textStyle: const TextStyle(
+                fontFamily: 'Manrope', fontWeight: FontWeight.w700))),
     inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surface,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        borderSide: const BorderSide(color: AppColors.inputBorder),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        borderSide: const BorderSide(color: AppColors.inputBorder),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-      hintStyle: const TextStyle(color: AppColors.textMuted),
-    ),
-    dividerTheme: const DividerThemeData(
-      color: AppColors.border,
-      thickness: 1,
-      space: 1,
-    ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.border)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.border)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+        labelStyle:
+            const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+    chipTheme: base.chipTheme.copyWith(
+        side: const BorderSide(color: AppColors.border),
+        shape: const StadiumBorder(),
+        selectedColor: AppColors.softPurple,
+        backgroundColor: Colors.white,
+        labelStyle: const TextStyle(
+            fontFamily: 'Manrope', fontSize: 12, fontWeight: FontWeight.w600)),
+    dividerTheme:
+        const DividerThemeData(color: AppColors.border, space: 1, thickness: 1),
+    snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.primaryDark,
+        behavior: SnackBarBehavior.floating,
+        shape: shape),
+    datePickerTheme: DatePickerThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        headerBackgroundColor: AppColors.primaryDark,
+        headerForegroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        dayShape: const WidgetStatePropertyAll(CircleBorder()),
+        todayBorder: const BorderSide(color: AppColors.primary)),
+    timePickerTheme: TimePickerThemeData(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))),
+    bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)))),
   );
 }

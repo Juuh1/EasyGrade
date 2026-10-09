@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="684" height="157" viewBox="0 0 684 157">
+  <defs>
+    <style>
+      .cls-1 {
+        font-size: 50px;
+        fill: #7952B9;
+        font-family: Tahoma;
+      }
+
+      .cls-2 {
+        fill: #342047;
+      }
+    </style>
+  </defs>
+  <text id="easygrade" class="cls-1" transform="translate(7.322 117.539) scale(2.928)">easy<tspan class="cls-2">grade</tspan></text>
+</svg>

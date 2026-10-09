@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../data/mock_data.dart';
+import '../data/session_store.dart';
 import '../models/filtro_avaliacao.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
 
-/// Abre o modal de Filtros/Busca por cima da tela de Histórico e retorna
-/// o [FiltroAvaliacao] resultante quando o usuário toca em "Aplicar
-/// filtros" (ou `null` se ele fechar o modal sem aplicar).
 Future<FiltroAvaliacao?> showFiltrosBottomSheet(
   BuildContext context, {
   required FiltroAvaliacao filtroAtual,
@@ -59,6 +56,14 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
   }
 
   void _aplicarFiltros() {
+    if (_periodoDe != null &&
+        _periodoAte != null &&
+        _periodoAte!.isBefore(_periodoDe!)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'A data final deve ser igual ou posterior à data inicial.')));
+      return;
+    }
     Navigator.of(context).pop(
       widget.filtroInicial.copyWith(
         status: _status,
@@ -82,7 +87,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
       firstDate: DateTime(agora.year - 2),
       lastDate: DateTime(agora.year + 2),
     );
-    if (selecionada == null) return;
+    if (!mounted || selecionada == null) return;
     setState(() {
       if (inicio) {
         _periodoDe = selecionada;
@@ -156,7 +161,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
                             label: Text(s.label),
                             selected: selecionado,
                             showCheckmark: false,
-                            selectedColor: AppColors.primary.withOpacity(0.08),
+                            selectedColor: AppColors.pillActiveBg,
                             backgroundColor: AppColors.surface,
                             side: BorderSide(
                               color: selecionado
@@ -181,7 +186,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
                       _Dropdown<String>(
                         value: _disciplina,
                         hint: 'Todas as disciplinas',
-                        items: MockData.disciplinas,
+                        items: SessionScope.of(context).disciplinas,
                         onChanged: (v) => setState(() => _disciplina = v),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -190,7 +195,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
                       _Dropdown<String>(
                         value: _turma,
                         hint: 'Todas as turmas',
-                        items: MockData.turmas,
+                        items: SessionScope.of(context).turmas,
                         onChanged: (v) => setState(() => _turma = v),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -280,12 +285,17 @@ class _Dropdown<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       hint: Text(hint, style: const TextStyle(color: AppColors.textMuted)),
-      icon:
-          const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
-      decoration: const InputDecoration(),
+      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primaryDark),
+      decoration: InputDecoration(
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          borderSide:
+              const BorderSide(color: AppColors.primaryDark, width: 1.5),
+        ),
+      ),
       items: items
           .map((item) => DropdownMenuItem<T>(
                 value: item,
@@ -323,12 +333,24 @@ class _DateField extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: InputDecorator(
-            decoration: const InputDecoration(),
+            decoration: InputDecoration(
+              suffixIcon: const Icon(
+                Icons.calendar_today_outlined,
+                size: 18,
+                color: AppColors.primaryDark,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderSide:
+                    const BorderSide(color: AppColors.primaryDark, width: 1.5),
+              ),
+            ),
             child: Text(
               value == null ? 'DD/MM/AAAA' : formatter.format(value!),
               style: TextStyle(
                 color:
                     value == null ? AppColors.textMuted : AppColors.textPrimary,
+                fontWeight: value != null ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ),
