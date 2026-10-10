@@ -25,18 +25,20 @@ class SessionStore extends ChangeNotifier {
       _gabaritos[a.id] =
           List.generate(a.numQuestoes, (i) => i % a.numAlternativas);
     }
-    final a = _avaliacoes.first;
-    _correcoes[a.id] = List.generate(
-        8,
-        (s) => Correcao(
-            alunoId: MockData.alunos[s].id,
-            alunoNome: MockData.alunos[s].nome,
-            respostas: List.generate(
-                a.numQuestoes,
-                (q) => q < 5 + (s % 5)
-                    ? q % a.numAlternativas
-                    : (q + 1) % a.numAlternativas),
-            lidaEm: DateTime(2026, 9, 28, 20, s)));
+    if (_avaliacoes.isNotEmpty) {
+      final a = _avaliacoes.first;
+      _correcoes[a.id] = List.generate(
+          8,
+          (s) => Correcao(
+              alunoId: MockData.alunos[s].id,
+              alunoNome: MockData.alunos[s].nome,
+              respostas: List.generate(
+                  a.numQuestoes,
+                  (q) => q < 5 + (s % 5)
+                      ? q % a.numAlternativas
+                      : (q + 1) % a.numAlternativas),
+              lidaEm: DateTime(2026, 9, 28, 20, s)));
+    }
   }
   List<Avaliacao> get avaliacoes => List.unmodifiable(_avaliacoes);
   Avaliacao avaliacao(String id) => _avaliacoes.firstWhere((a) => a.id == id);
