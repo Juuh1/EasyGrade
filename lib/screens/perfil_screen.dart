@@ -71,7 +71,7 @@ class PerfilScreen extends StatelessWidget {
               label: const Text('Sair da conta')),
           const SizedBox(height: 20),
           const Center(
-              child: Text('EasyGrade · N1 · versão 0.2.0',
+              child: Text('EasyGrade · versão 0.3.0',
                   style: TextStyle(fontSize: 10, color: AppColors.textMuted)))
         ]));
   }

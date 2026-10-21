@@ -25,6 +25,9 @@ tmp/
 .pub-cache/
 .pub/
 /build/
+node_modules/
+.firebase/
+*-debug.log
 /entrega/*.apk
 
 # Arquivos locais de apoio

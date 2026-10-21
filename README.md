@@ -6,7 +6,39 @@
 
 Aplicativo Flutter para professores que corrigem avaliações objetivas em papel. O professor prepara o gabarito, identifica a folha de respostas do aluno, confere a leitura e acompanha notas e alternativas assinaladas.
 
-Esta versão é o **protótipo N1**, com telas navegáveis, dados fictícios e estado em memória. Não há banco de dados, autenticação real, reconhecimento pela câmera ou serviços externos.
+Esta etapa prepara a **N2** com Firebase Authentication, login por e-mail ou Google e uma camada reutilizável de acesso ao Cloud Firestore. A interface e as classes de domínio da N1 foram preservadas. Os módulos de avaliações, turmas, questões e correções ainda usam os dados de demonstração até sua integração pelos responsáveis.
+
+## Configuração Firebase
+
+O projeto é `easygrade-dc9be`, com aplicativos Android (`com.example.easy_grade`) e Web. A conta autenticada define o caminho `usuarios/{uid}`; não se deve passar um identificador de outro professor para acessar dados.
+
+`FirestoreRepository`, em `lib/data/firestore_repository.dart`, oferece `criar`, `obter`, `listar`, `acompanhar`, `salvar`, `atualizar` e `excluir`. Os métodos retornam `Future` ou `Stream`: as telas devem aguardar a gravação e tratar os erros antes de confirmar uma operação. O repositório inclui automaticamente a versão do esquema e as datas do servidor, preservando a data de criação.
+
+```dart
+final dados = FirestoreRepository();
+final id = await dados.criar('turmas', {'nome': 'Turma A'});
+await dados.atualizar('turmas', id, {'nome': 'Turma B'});
+final turmas = await dados.listar('turmas');
+```
+
+As coleções principais são `avaliacoes`, `turmas`, `alunos`, `disciplinas` e `questoes`. Cada avaliação pode conter `gabaritos`, `correcoes`, `variantes` e `materiais`; cada turma pode conter seus `alunos`. A estrutura reserva as variações e os materiais para a evolução prevista no relato, sem implementar reconhecimento de imagem ou geração de arquivos nesta etapa. As coleções aparecem no console quando recebem seu primeiro documento; não são criados registros fictícios para preenchê-las.
+
+Ao integrar os modelos, serialize o status da avaliação como `rascunho`, `agendada` ou `concluida` e as datas como `Timestamp`. As alternativas usam índices a partir de zero; nas respostas, `null` representa branco, `-1` marcação múltipla e `-2` leitura incerta. O gabarito e cada correção devem ter a mesma quantidade de respostas definida na avaliação. Excluir um documento não exclui suas subcoleções; o fluxo de exclusão de avaliações e turmas deve tratar seus registros filhos.
+
+As regras em `firestore.rules` restringem o acesso ao próprio professor e validam os dados. Senhas são administradas pelo Firebase Authentication e não são gravadas no Firestore. Os identificadores públicos do SDK ficam em `lib/firebase_options.dart`; o login Google no Android recebe o cliente Web em `serverClientId`, sem depender de `google-services.json`. Certificados privados e credenciais administrativas não fazem parte do repositório.
+
+Para verificar as regras com dados isolados do projeto real:
+
+```bash
+npm ci
+npm run test:firestore
+```
+
+O teste usa o projeto local `demo-easygrade` e precisa de Java 21 ou mais recente. Os certificados SHA-1/SHA-256 cadastrados correspondem ao APK assinado neste computador. Cada integrante que gerar seu próprio APK deve cadastrar o certificado usado por sua instalação para utilizar o login Google.
+
+## Base da N1
+
+As seções abaixo registram os fluxos e limites do protótipo que serve de base para a integração dos módulos.
 
 ## Objetivo
 
