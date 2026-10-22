@@ -1,0 +1,108 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function dono(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function texto(valor, limite) {
+      return valor is string && valor.size() > 0 && valor.size() <= limite;
+    }
+
+    function metadados() {
+      let d = request.resource.data;
+      return d.versaoEsquema == 1
+        && d.criadoEm is timestamp
+        && d.atualizadoEm == request.time;
+    }
+
+    function criacao() {
+      return metadados() && request.resource.data.criadoEm == request.time;
+    }
+
+    function atualizacao() {
+      return metadados()
+        && request.resource.data.criadoEm == resource.data.criadoEm;
+    }
+
+    function perfilValido() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['nome', 'email', 'instituicao', 'reduzirMovimento',
+          'criadoEm', 'atualizadoEm', 'versaoEsquema'])
+        && texto(d.nome, 200)
+        && d.email == request.auth.token.email
+        && d.instituicao is string && d.instituicao.size() <= 200
+        && d.reduzirMovimento is bool;
+    }
+
+    function entidadeValida(colecao) {
+      let d = request.resource.data;
+      return (colecao == 'turmas' && texto(d.nome, 200))
+        || (colecao == 'alunos' && texto(d.nome, 200))
+        || (colecao == 'disciplinas' && texto(d.nome, 120))
+        || (colecao == 'questoes'
+          && texto(d.enunciado, 20000) && texto(d.disciplina, 120)
+          && d.alternativas is list
+          && d.alternativas.size() >= 2 && d.alternativas.size() <= 5
+          && d.correta is int && d.correta >= 0
+          && d.correta < d.alternativas.size())
+        || (colecao == 'avaliacoes'
+          && texto(d.nome, 200) && texto(d.codigo, 120)
+          && texto(d.disciplina, 120) && texto(d.turma, 200)
+          && (d.get('data', null) == null || d.data is timestamp)
+          && d.numQuestoes is int && d.numQuestoes >= 1 && d.numQuestoes <= 60
+          && d.numAlternativas is int && d.numAlternativas >= 2 && d.numAlternativas <= 5
+          && d.status in ['rascunho', 'agendada', 'concluida']);
+    }
+
+    function filhaValida(uid, avaliacaoId, colecao) {
+      let d = request.resource.data;
+      let a = get(/databases/$(database)/documents/usuarios/$(uid)/avaliacoes/$(avaliacaoId)).data;
+      return (colecao == 'gabaritos'
+          && d.respostas is list && d.respostas.size() == a.numQuestoes
+          && d.respostas.toSet().hasOnly([null, 0, 1, 2, 3, 4])
+          && (a.numAlternativas == 5 || !d.respostas.hasAny([4]))
+          && (a.numAlternativas >= 4 || !d.respostas.hasAny([3]))
+          && (a.numAlternativas >= 3 || !d.respostas.hasAny([2])))
+        || (colecao == 'correcoes'
+          && texto(d.alunoId, 200) && texto(d.alunoNome, 200)
+          && texto(d.variante, 120) && d.lidaEm is timestamp
+          && d.respostas is list && d.respostas.size() == a.numQuestoes
+          && d.respostas.toSet().hasOnly([null, -2, -1, 0, 1, 2, 3, 4])
+          && (a.numAlternativas == 5 || !d.respostas.hasAny([4]))
+          && (a.numAlternativas >= 4 || !d.respostas.hasAny([3]))
+          && (a.numAlternativas >= 3 || !d.respostas.hasAny([2])))
+        || (colecao == 'variantes' && d.questoes is list && d.questoes.size() <= 60)
+        || (colecao == 'materiais' && texto(d.tipo, 120));
+    }
+
+    match /usuarios/{uid} {
+      allow read: if dono(uid);
+      allow create: if dono(uid) && criacao() && perfilValido();
+      allow update: if dono(uid) && atualizacao() && perfilValido();
+      allow delete: if false;
+
+      match /{colecao}/{id} {
+        allow read, delete: if dono(uid)
+          && colecao in ['turmas', 'alunos', 'disciplinas', 'questoes', 'avaliacoes'];
+        allow create: if dono(uid) && criacao() && entidadeValida(colecao);
+        allow update: if dono(uid) && atualizacao() && entidadeValida(colecao);
+      }
+
+      match /turmas/{turmaId}/alunos/{alunoId} {
+        allow read, delete: if dono(uid);
+        allow create: if dono(uid) && criacao() && entidadeValida('alunos')
+          && exists(/databases/$(database)/documents/usuarios/$(uid)/turmas/$(turmaId));
+        allow update: if dono(uid) && atualizacao() && entidadeValida('alunos');
+      }
+
+      match /avaliacoes/{avaliacaoId}/{colecao}/{id} {
+        allow read, delete: if dono(uid)
+          && colecao in ['gabaritos', 'correcoes', 'variantes', 'materiais'];
+        allow create: if dono(uid) && criacao() && filhaValida(uid, avaliacaoId, colecao);
+        allow update: if dono(uid) && atualizacao() && filhaValida(uid, avaliacaoId, colecao);
+      }
+    }
+  }
+}

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../data/auth_service.dart';
 import '../data/session_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLogin;
-  const LoginScreen({super.key, required this.onLogin});
+  final AuthService? authService;
+  const LoginScreen({super.key, required this.onLogin, this.authService});
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -14,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final _user = TextEditingController(), _senha = TextEditingController();
   bool _obscure = true;
+  bool _ocupado = false;
   String? _error;
   @override
   void dispose() {
@@ -24,11 +27,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _entrar() {
     if (!_form.currentState!.validate()) return;
+    if (widget.authService != null) {
+      _autenticar(() => widget.authService!.entrar(_user.text, _senha.text));
+      return;
+    }
     if (_user.text.trim().toLowerCase() != 'user' || _senha.text != 'User') {
       setState(() => _error = 'Use o acesso de demonstração: User / User.');
       return;
     }
     widget.onLogin();
+  }
+
+  Future<void> _autenticar(Future<void> Function() operacao) async {
+    if (_ocupado) return;
+    setState(() {
+      _ocupado = true;
+      _error = null;
+    });
+    try {
+      await operacao();
+      if (mounted) widget.onLogin();
+    } catch (erro) {
+      if (mounted) setState(() => _error = mensagemAutenticacao(erro));
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
   }
 
   @override
@@ -88,16 +111,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const FormLabel('Usuário'),
+                      FormLabel(
+                          widget.authService == null ? 'Usuário' : 'E-mail'),
                       TextFormField(
                           controller: _user,
                           textInputAction: TextInputAction.next,
+                          keyboardType: widget.authService == null
+                              ? TextInputType.text
+                              : TextInputType.emailAddress,
                           autofillHints: const [AutofillHints.username],
-                          decoration: const InputDecoration(
-                              hintText: 'Seu usuário',
-                              prefixIcon:
-                                  Icon(Icons.person_outline_rounded, size: 20)),
-                          validator: obrigatorio),
+                          decoration: InputDecoration(
+                              hintText: widget.authService == null
+                                  ? 'Seu usuário'
+                                  : 'Seu e-mail',
+                              prefixIcon: const Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 20)),
+                          validator: widget.authService == null
+                              ? obrigatorio
+                              : validarEmail),
                       const FormLabel('Senha'),
                       TextFormField(
                           controller: _senha,
@@ -123,8 +155,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                              onPressed: () =>
-                                  abrir(context, const RecuperarSenhaScreen()),
+                              onPressed: _ocupado
+                                  ? null
+                                  : () => abrir(
+                                      context,
+                                      RecuperarSenhaScreen(
+                                          authService: widget.authService)),
                               child: const Text('Esqueci minha senha',
                                   style: TextStyle(fontSize: 12)))),
                       if (_error != null) ...[
@@ -132,23 +168,43 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 12)
                       ],
                       ElevatedButton(
-                          onPressed: _entrar,
-                          child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('Entrar'),
-                                SizedBox(width: 10),
-                                Icon(Icons.arrow_forward_rounded, size: 18)
-                              ])),
+                          onPressed: _ocupado ? null : _entrar,
+                          child: _ocupado
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                      Text('Entrar'),
+                                      SizedBox(width: 10),
+                                      Icon(Icons.arrow_forward_rounded,
+                                          size: 18)
+                                    ])),
                     ])),
             const SizedBox(height: 16),
-            const InfoBanner(
-                'Acesso de demonstração: User / User. Os dados desta versão são fictícios.',
-                icon: Icons.science_outlined),
+            if (widget.authService != null) ...[
+              OutlinedButton(
+                  onPressed: _ocupado
+                      ? null
+                      : () => _autenticar(widget.authService!.entrarComGoogle),
+                  child: const Text('Continuar com Google')),
+              const SizedBox(height: 12),
+            ] else
+              const InfoBanner(
+                  'Acesso de demonstração: User / User. Os dados desta versão são fictícios.',
+                  icon: Icons.science_outlined),
             const SizedBox(height: 12),
             TextButton(
-                onPressed: () =>
-                    abrir(context, CadastroScreen(onLogin: widget.onLogin)),
+                onPressed: _ocupado
+                    ? null
+                    : () => abrir(
+                        context,
+                        CadastroScreen(
+                            onLogin: widget.onLogin,
+                            authService: widget.authService)),
                 child: const Text('Primeiro acesso? Criar conta')),
           ])));
 }
@@ -162,7 +218,8 @@ String? validarEmail(String? value) => value == null ||
 
 class CadastroScreen extends StatefulWidget {
   final VoidCallback onLogin;
-  const CadastroScreen({super.key, required this.onLogin});
+  final AuthService? authService;
+  const CadastroScreen({super.key, required this.onLogin, this.authService});
   @override
   State<CadastroScreen> createState() => _CadastroScreenState();
 }
@@ -174,6 +231,8 @@ class _CadastroScreenState extends State<CadastroScreen> {
       _instituicao = TextEditingController(),
       _senha = TextEditingController();
   bool _termos = false, _obscure = true;
+  bool _ocupado = false;
+  String? _erro;
   @override
   void dispose() {
     _nome.dispose();
@@ -183,8 +242,27 @@ class _CadastroScreenState extends State<CadastroScreen> {
     super.dispose();
   }
 
-  void _salvar() {
+  Future<void> _salvar() async {
+    if (_ocupado) return;
     if (!_form.currentState!.validate()) return;
+    if (widget.authService != null) {
+      setState(() {
+        _ocupado = true;
+        _erro = null;
+      });
+      try {
+        await widget.authService!
+            .cadastrar(_nome.text, _email.text, _senha.text, _instituicao.text);
+        if (!mounted) return;
+        Navigator.pop(context);
+        widget.onLogin();
+      } catch (erro) {
+        if (mounted) setState(() => _erro = mensagemAutenticacao(erro));
+      } finally {
+        if (mounted) setState(() => _ocupado = false);
+      }
+      return;
+    }
     if (!_termos) {
       avisar(context, 'Confirme que entendeu o acesso de demonstração.');
       return;
@@ -240,25 +318,33 @@ class _CadastroScreenState extends State<CadastroScreen> {
                       v != _senha.text ? 'As senhas devem ser iguais.' : null),
             ])),
         const SizedBox(height: 20),
-        const InfoBanner(
-            'Cadastro demonstrativo. Seu perfil fica disponível nesta sessão; a senha não é armazenada.'),
-        CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _termos,
-            onChanged: (v) => setState(() => _termos = v!),
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text(
-                'Entendi que este é um protótipo com dados de demonstração.',
-                style: TextStyle(fontSize: 12))),
+        if (_erro != null) InfoBanner(_erro!, warning: true),
+        if (widget.authService == null) ...[
+          const InfoBanner(
+              'Cadastro demonstrativo. Seu perfil fica disponível nesta sessão; a senha não é armazenada.'),
+          CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _termos,
+              onChanged: (v) => setState(() => _termos = v!),
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text(
+                  'Entendi que este é um protótipo com dados de demonstração.',
+                  style: TextStyle(fontSize: 12))),
+        ],
         const SizedBox(height: 16),
         ElevatedButton(
-            onPressed: _salvar,
-            child: const Text('Criar conta de demonstração')),
+            onPressed: _ocupado ? null : _salvar,
+            child: Text(_ocupado
+                ? 'Criando conta…'
+                : widget.authService == null
+                    ? 'Criar conta de demonstração'
+                    : 'Criar conta')),
       ]));
 }
 
 class RecuperarSenhaScreen extends StatefulWidget {
-  const RecuperarSenhaScreen({super.key});
+  final AuthService? authService;
+  const RecuperarSenhaScreen({super.key, this.authService});
   @override
   State<RecuperarSenhaScreen> createState() => _RecuperarSenhaScreenState();
 }
@@ -267,6 +353,8 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   bool _enviado = false;
+  bool _ocupado = false;
+  String? _erro;
   @override
   void dispose() {
     _email.dispose();
@@ -280,13 +368,18 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
         PageHeading(
             title: _enviado ? 'Recuperação de acesso' : 'Esqueceu sua senha?',
             subtitle: _enviado
-                ? 'Assim será a confirmação da recuperação de acesso.'
+                ? widget.authService == null
+                    ? 'Assim será a confirmação da recuperação de acesso.'
+                    : 'Confira a caixa de entrada e o spam.'
                 : 'Informe o e-mail associado à sua conta.'),
         if (_enviado) ...[
-          const EmptyState(
-              title: 'Solicitação simulada',
-              subtitle:
-                  'Nenhum e-mail foi enviado nesta versão.\nPara entrar na demonstração, use User / User.',
+          EmptyState(
+              title: widget.authService == null
+                  ? 'Solicitação simulada'
+                  : 'Solicitação recebida',
+              subtitle: widget.authService == null
+                  ? 'Nenhum e-mail foi enviado nesta versão.\nPara entrar na demonstração, use User / User.'
+                  : 'Se houver uma conta com este e-mail, você receberá as instruções de recuperação.',
               icon: Icons.mark_email_read_outlined),
           ElevatedButton(
               onPressed: () => Navigator.pop(context),
@@ -302,16 +395,33 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                       prefixIcon: Icon(Icons.mail_outline_rounded)),
                   validator: validarEmail)),
           const SizedBox(height: 24),
+          if (_erro != null) InfoBanner(_erro!, warning: true),
           ElevatedButton(
-              onPressed: () {
-                if (_form.currentState!.validate()) {
-                  setState(() => _enviado = true);
-                }
-              },
-              child: const Text('Solicitar recuperação')),
+              onPressed: _ocupado
+                  ? null
+                  : () async {
+                      if (!_form.currentState!.validate()) return;
+                      setState(() {
+                        _ocupado = true;
+                        _erro = null;
+                      });
+                      try {
+                        await widget.authService?.recuperarSenha(_email.text);
+                        if (!mounted) return;
+                        setState(() => _enviado = true);
+                      } catch (erro) {
+                        if (mounted) {
+                          setState(() => _erro = mensagemAutenticacao(erro));
+                        }
+                      } finally {
+                        if (mounted) setState(() => _ocupado = false);
+                      }
+                    },
+              child: Text(_ocupado ? 'Enviando…' : 'Solicitar recuperação')),
           const SizedBox(height: 16),
-          const InfoBanner(
-              'Você está visualizando o fluxo demonstrativo de recuperação de senha.')
+          if (widget.authService == null)
+            const InfoBanner(
+                'Você está visualizando o fluxo demonstrativo de recuperação de senha.')
         ],
       ]));
 }
