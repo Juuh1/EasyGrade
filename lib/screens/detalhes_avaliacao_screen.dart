@@ -43,7 +43,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                 }
                 if (value == 'excluir') {
                   if (await confirmar(context, 'Excluir esta avaliação?',
-                      'O gabarito e as correções desta avaliação serão removidos da sessão.',
+                      'O gabarito e as correções desta avaliação serão removidos do históico.',
                       action: 'Excluir')) {
                     if (!context.mounted) return;
                     Navigator.pop(context);
