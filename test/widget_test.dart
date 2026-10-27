@@ -4,6 +4,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:easy_grade/main.dart';
 import 'package:easy_grade/data/session_store.dart';
+import 'package:easy_grade/models/avaliacao.dart';
+import 'package:easy_grade/models/status_avaliacao.dart';
 import 'package:easy_grade/models/correcao.dart';
 import 'package:easy_grade/screens/auth_screens.dart';
 import 'package:easy_grade/screens/apoio_screens.dart';
@@ -20,6 +22,48 @@ import 'package:easy_grade/screens/splash_screen.dart';
 import 'package:easy_grade/screens/layout_prova_screen.dart';
 import 'package:easy_grade/theme/app_theme.dart';
 
+SessionStore _criarStoreComDados() {
+  final store = SessionStore();
+  store.adicionarTurma('2ª fase B');
+  store.adicionarAluno('2ª fase B', const Aluno('a1', 'Aluno 1'));
+  store.adicionarTurma('3ª fase A');
+  store.adicionarAluno('3ª fase A', const Aluno('2026001', 'Aluno de Exemplo'));
+  store.salvar(const Avaliacao(
+    id: '1',
+    codigo: 'EVAL-2026-N1',
+    nome: 'Prova N1 — Lógica',
+    disciplina: 'Lógica',
+    turma: '3ª fase A',
+    data: null,
+    numQuestoes: 5,
+    numAlternativas: 5,
+    status: StatusAvaliacao.concluida,
+  ));
+  store.salvarGabarito('1', [0, 1, 2, 3, 4]);
+  store.salvarCorrecao(
+    '1',
+    Correcao(
+      alunoId: '2026001',
+      alunoNome: 'Aluno de Exemplo',
+      respostas: [0, 1, 2, 3, 4],
+      lidaEm: DateTime(2026, 9, 28, 20, 0),
+    ),
+  );
+  store.salvar(const Avaliacao(
+    id: '2',
+    codigo: 'EVAL-2026-N2',
+    nome: 'Revisão — Algoritmos',
+    disciplina: 'Algoritmos e Estrutura de Dados',
+    turma: '2ª fase B',
+    data: null,
+    numQuestoes: 10,
+    numAlternativas: 4,
+    status: StatusAvaliacao.agendada,
+  ));
+  store.salvarGabarito('2', [0, 1, 2, 3, 0, 1, 2, 3, 0, 1]);
+  return store;
+}
+
 Widget harness(SessionStore store, Widget screen, {double scale = 1}) =>
     SessionScope(
         store: store,
@@ -34,8 +78,8 @@ Widget harness(SessionStore store, Widget screen, {double scale = 1}) =>
                 child: child!),
             home: screen));
 
-Future<void> login(WidgetTester tester) async {
-  await tester.pumpWidget(const N1App());
+Future<void> login(WidgetTester tester, [SessionStore? store]) async {
+  await tester.pumpWidget(N1App(store: store));
   await tester.pumpAndSettle();
   final fields = find.byType(EditableText);
   await tester.enterText(fields.at(0), 'User');
@@ -58,7 +102,9 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await login(tester);
+    final store = _criarStoreComDados();
+    addTearDown(store.dispose);
+    await login(tester, store);
     expect(find.text('Olá, User.'), findsOneWidget);
     await tester.tap(find.text('Avaliações', skipOffstage: true));
     await tester.pumpAndSettle();
@@ -79,7 +125,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final store = SessionStore();
+    final store = _criarStoreComDados();
     addTearDown(store.dispose);
     await tester
         .pumpWidget(harness(store, const CapturaScreen(avaliacaoId: '2')));
@@ -149,7 +195,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final store = SessionStore();
+      final store = _criarStoreComDados();
       addTearDown(store.dispose);
       final screens = <Widget>[
         LoginScreen(onLogin: () {}),

@@ -128,6 +128,18 @@ class _SessaoAutenticada extends StatefulWidget {
 class _SessaoAutenticadaState extends State<_SessaoAutenticada> {
   late Future<void> _perfil = _carregar();
 
+  @override
+  void initState() {
+    super.initState();
+    widget.store.conectar(widget.service.dados);
+  }
+
+  @override
+  void dispose() {
+    widget.store.desconectar(notificar: false);
+    super.dispose();
+  }
+
   Future<void> _carregar() async {
     final perfil = await widget.service.carregarPerfil(widget.user);
     if (!mounted) return;

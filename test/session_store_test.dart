@@ -17,14 +17,49 @@ void main() {
   test('uma nova leitura substitui o resultado do mesmo aluno', () {
     final store = SessionStore();
     addTearDown(store.dispose);
+    store.salvar(const Avaliacao(
+        id: '1',
+        codigo: 'EG-1',
+        nome: 'Prova',
+        disciplina: 'Teste',
+        turma: '3ª fase A',
+        data: null,
+        numQuestoes: 5,
+        numAlternativas: 5,
+        status: StatusAvaliacao.agendada));
+    store.salvarGabarito('1', [0, 1, 2, 3, 4]);
     final key = store.gabarito('1');
-    final old = store.correcoes('1').first;
+    store.salvarCorrecao(
+        '1',
+        Correcao(
+            alunoId: 'a1', alunoNome: 'Aluno', respostas: [0, 0, 0, 0, 0]));
     final count = store.correcoes('1').length;
-    store.salvarCorrecao('1', old.copyWith(respostas: key));
+    store.salvarCorrecao(
+        '1', store.correcoes('1').first.copyWith(respostas: key));
     expect(store.correcoes('1').length, count);
     expect(store.correcoes('1').first.nota(key), 10);
     store.salvarGabarito('1', key.map((v) => (v! + 1) % 5).toList());
     expect(store.correcoes('1').first.nota(store.gabarito('1')), 0);
+  });
+  test('avaliação converte de/para o formato do Firestore', () {
+    final original = Avaliacao(
+        id: 'x',
+        codigo: 'EG-X',
+        nome: 'Prova',
+        disciplina: 'Algoritmos',
+        turma: '2ª fase B',
+        data: DateTime(2026, 10, 8, 8),
+        numQuestoes: 10,
+        numAlternativas: 4,
+        status: StatusAvaliacao.agendada);
+    final copia = Avaliacao.fromMap({...original.toMap(), 'id': 'x'});
+    expect(copia.id, original.id);
+    expect(copia.nome, original.nome);
+    expect(copia.data, original.data);
+    expect(copia.numQuestoes, original.numQuestoes);
+    expect(copia.numAlternativas, original.numAlternativas);
+    expect(copia.status, original.status);
+    expect(original.toMap().containsKey('id'), isFalse);
   });
   test('criação, duplicação e exclusão não alteram a avaliação original', () {
     final store = SessionStore();

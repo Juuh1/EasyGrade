@@ -128,7 +128,15 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                   child: const Text('Limpar filtros'))
           ]),
           const SizedBox(height: 10),
-          if (lista.isEmpty)
+          if (store.erroAvaliacoes != null) ...[
+            InfoBanner(store.erroAvaliacoes!, warning: true),
+            const SizedBox(height: 10),
+          ],
+          if (store.carregandoAvaliacoes)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(child: CircularProgressIndicator()))
+          else if (lista.isEmpty)
             EmptyState(
                 title: 'Nenhuma avaliação encontrada',
                 subtitle: 'Ajuste a busca ou crie uma nova avaliação.',

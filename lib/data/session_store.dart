@@ -1,12 +1,16 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/material.dart';
 import '../models/avaliacao.dart';
 import '../models/correcao.dart';
 import '../models/status_avaliacao.dart';
+import 'firestore_repository.dart';
 import 'mock_data.dart';
 
-/// Estado da sessão da N1, mantido em memória.
+/// Estado da sessão. As avaliações vêm do Firestore (módulo 1) depois de
+/// [conectar]; o restante ainda é mantido em memória.
 class SessionStore extends ChangeNotifier {
-  final List<Avaliacao> _avaliacoes = MockData.avaliacoes;
+  final List<Avaliacao> _avaliacoes = [];
   final Map<String, List<int?>> _gabaritos = {};
   final Map<String, List<Correcao>> _correcoes = {};
   final Map<String, List<Questao>> _questoes = {};
@@ -19,27 +23,81 @@ class SessionStore extends ChangeNotifier {
       email = 'user@easygrade.app',
       instituicao = 'Católica de Santa Catarina';
   bool reduzirMovimento = false;
-  SessionStore() {
-    for (final a
-        in _avaliacoes.where((a) => a.status != StatusAvaliacao.rascunho)) {
-      _gabaritos[a.id] =
-          List.generate(a.numQuestoes, (i) => i % a.numAlternativas);
-    }
-    if (_avaliacoes.isNotEmpty) {
-      final a = _avaliacoes.first;
-      _correcoes[a.id] = List.generate(
-          8,
-          (s) => Correcao(
-              alunoId: MockData.alunos[s].id,
-              alunoNome: MockData.alunos[s].nome,
-              respostas: List.generate(
-                  a.numQuestoes,
-                  (q) => q < 5 + (s % 5)
-                      ? q % a.numAlternativas
-                      : (q + 1) % a.numAlternativas),
-              lidaEm: DateTime(2026, 9, 28, 20, s)));
-    }
+  FirestoreRepository? _repo;
+  StreamSubscription<List<Map<String, dynamic>>>? _avaliacoesSub;
+  bool carregandoAvaliacoes = false;
+  String? erroAvaliacoes;
+  SessionStore();
+
+  /// Liga a lista de avaliações ao Firestore do professor autenticado.
+  /// Não notifica de forma síncrona porque é chamado durante o initState.
+  void conectar(FirestoreRepository repo) {
+    _avaliacoesSub?.cancel();
+    _repo = repo;
+    carregandoAvaliacoes = true;
+    erroAvaliacoes = null;
+    _avaliacoesSub = repo.acompanhar('avaliacoes').listen((docs) {
+      final ordenados = [...docs]
+        ..sort((a, b) => _criadoEm(b).compareTo(_criadoEm(a)));
+      final lista = <Avaliacao>[];
+      for (final doc in ordenados) {
+        try {
+          lista.add(Avaliacao.fromMap(doc));
+        } catch (_) {
+          // Documento fora do esquema esperado: não entra na lista.
+        }
+      }
+      _avaliacoes
+        ..clear()
+        ..addAll(lista);
+      carregandoAvaliacoes = false;
+      notifyListeners();
+    }, onError: (Object _) {
+      carregandoAvaliacoes = false;
+      erroAvaliacoes =
+          'Não foi possível carregar suas avaliações. Confira a conexão e tente novamente.';
+      notifyListeners();
+    });
   }
+
+  /// Desliga o Firestore e limpa os dados do professor (logout).
+  void desconectar({bool notificar = true}) {
+    _avaliacoesSub?.cancel();
+    _avaliacoesSub = null;
+    _repo = null;
+    _avaliacoes.clear();
+    _gabaritos.clear();
+    _correcoes.clear();
+    _questoes.clear();
+    _paginas.clear();
+    carregandoAvaliacoes = false;
+    erroAvaliacoes = null;
+    if (notificar) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _avaliacoesSub?.cancel();
+    super.dispose();
+  }
+
+  // Documentos com data de criação pendente (null) são os mais novos.
+  static int _criadoEm(Map<String, dynamic> doc) {
+    final v = doc['criadoEm'];
+    return v is Timestamp ? v.millisecondsSinceEpoch : 9007199254740991;
+  }
+
+  void _gravar(Future<void> Function(FirestoreRepository repo) operacao) {
+    final repo = _repo;
+    if (repo == null) return;
+    erroAvaliacoes = null;
+    operacao(repo).catchError((Object _) {
+      erroAvaliacoes =
+          'Não foi possível sincronizar com o Firestore. A alteração pode não ter sido salva.';
+      notifyListeners();
+    });
+  }
+
   List<Avaliacao> get avaliacoes => List.unmodifiable(_avaliacoes);
   Avaliacao avaliacao(String id) => _avaliacoes.firstWhere((a) => a.id == id);
   List<Aluno> alunos(String turma) => List.unmodifiable(_turmas[turma] ?? []);
@@ -93,6 +151,7 @@ class SessionStore extends ChangeNotifier {
       _avaliacoes[index] = a;
     }
     notifyListeners();
+    _gravar((repo) => repo.salvar('avaliacoes', a.id, a.toMap()));
   }
 
   void salvarGabarito(String id, List<int?> respostas) {
@@ -126,6 +185,7 @@ class SessionStore extends ChangeNotifier {
     _questoes.remove(id);
     _paginas.remove(id);
     notifyListeners();
+    _gravar((repo) => repo.excluir('avaliacoes', id));
   }
 
   void duplicar(String id) {
