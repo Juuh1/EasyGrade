@@ -14,6 +14,7 @@ void main() {
     expect(
         r.copyWith(respostas: [0, 1, null, null, 4]).precisaRevisao, isFalse);
   });
+
   test('uma nova leitura substitui o resultado do mesmo aluno', () {
     final store = SessionStore();
     addTearDown(store.dispose);
@@ -41,6 +42,7 @@ void main() {
     store.salvarGabarito('1', key.map((v) => (v! + 1) % 5).toList());
     expect(store.correcoes('1').first.nota(store.gabarito('1')), 0);
   });
+
   test('avaliação converte de/para o formato do Firestore', () {
     final original = Avaliacao(
         id: 'x',
@@ -61,6 +63,32 @@ void main() {
     expect(copia.status, original.status);
     expect(original.toMap().containsKey('id'), isFalse);
   });
+
+  test('aluno converte de/para o formato do Firestore', () {
+    const original = Aluno('2026001', 'Aluno Teste');
+    final copia = Aluno.fromMap({...original.toMap(), 'id': original.id});
+    expect(copia.id, original.id);
+    expect(copia.nome, original.nome);
+    expect(original.toMap().containsKey('id'), isFalse);
+  });
+
+  test('questão converte de/para o formato do Firestore', () {
+    const original = Questao(
+      id: 'q1',
+      enunciado: 'Qual a resposta correta?',
+      disciplina: 'Física',
+      alternativas: ['A', 'B', 'C', 'D'],
+      correta: 2,
+    );
+    final copia = Questao.fromMap({...original.toMap(), 'id': original.id});
+    expect(copia.id, original.id);
+    expect(copia.enunciado, original.enunciado);
+    expect(copia.disciplina, original.disciplina);
+    expect(copia.alternativas, original.alternativas);
+    expect(copia.correta, original.correta);
+    expect(original.toMap().containsKey('id'), isFalse);
+  });
+
   test('criação, duplicação e exclusão não alteram a avaliação original', () {
     final store = SessionStore();
     addTearDown(store.dispose);
@@ -85,6 +113,7 @@ void main() {
     expect(store.avaliacao('nova').nome, 'Nova');
     expect(store.gabarito('nova'), [0, 1, 2]);
   });
+
   test('matrículas repetidas não entram na mesma turma e não há persistência',
       () {
     final store = SessionStore();
@@ -96,5 +125,77 @@ void main() {
     final outraSessao = SessionStore();
     addTearDown(outraSessao.dispose);
     expect(outraSessao.turmas, isNot(contains('Nova turma')));
+  });
+
+  test('turmas e alunos permitem adicionar, listar e remover', () {
+    final store = SessionStore();
+    addTearDown(store.dispose);
+    store.adicionarTurma('Turma Alpha');
+    expect(store.turmas, contains('Turma Alpha'));
+
+    store.adicionarAluno('Turma Alpha', const Aluno('101', 'Maria'));
+    expect(store.alunos('Turma Alpha').length, 1);
+    expect(store.alunos('Turma Alpha').first.nome, 'Maria');
+
+    store.removerAluno('Turma Alpha', '101');
+    expect(store.alunos('Turma Alpha'), isEmpty);
+
+    store.removerTurma('Turma Alpha');
+    expect(store.turmas, isNot(contains('Turma Alpha')));
+  });
+
+  test('banco de questões permite adicionar, listar e excluir', () {
+    final store = SessionStore();
+    addTearDown(store.dispose);
+    const q1 = Questao(
+      id: 'q1',
+      enunciado: 'Pergunta 1',
+      disciplina: 'Matemática',
+      alternativas: ['1', '2'],
+      correta: 0,
+    );
+    store.adicionarQuestao(q1);
+    expect(store.bancoQuestoes.length, 1);
+    expect(store.bancoQuestoes.first.enunciado, 'Pergunta 1');
+    expect(store.disciplinas, contains('Matemática'));
+
+    store.excluirQuestao('q1');
+    expect(store.bancoQuestoes, isEmpty);
+  });
+
+  test('salvarQuestoes sincroniza questoes e gera o gabarito correspondente', () async {
+    final store = SessionStore();
+    addTearDown(store.dispose);
+    await store.salvar(const Avaliacao(
+        id: 'av1',
+        codigo: 'EG-AV1',
+        nome: 'Avaliação 1',
+        disciplina: 'Física',
+        turma: '1º Ano A',
+        data: null,
+        numQuestoes: 2,
+        numAlternativas: 4,
+        status: StatusAvaliacao.rascunho));
+
+    const q1 = Questao(
+      id: 'q1',
+      enunciado: 'Q1',
+      disciplina: 'Física',
+      alternativas: ['A', 'B', 'C', 'D'],
+      correta: 1,
+    );
+    const q2 = Questao(
+      id: 'q2',
+      enunciado: 'Q2',
+      disciplina: 'Física',
+      alternativas: ['A', 'B', 'C', 'D'],
+      correta: 3,
+    );
+
+    await store.salvarQuestoes('av1', [q1, q2]);
+    expect(store.questoes('av1').length, 2);
+    expect(store.variantesQuestoesIds('av1'), ['q1', 'q2']);
+    expect(store.gabarito('av1'), [1, 3]);
+    expect(store.gabaritoPronto('av1'), isTrue);
   });
 }

@@ -19,6 +19,11 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
     final store = SessionScope.of(context);
     final a = store.avaliacoes.where((a) => a.id == avaliacaoId).firstOrNull;
     if (a == null) {
+      if (store.carregandoAvaliacoes) {
+        return const AppPage(
+            title: 'Carregando avaliação',
+            child: Center(child: CircularProgressIndicator()));
+      }
       return const AppPage(
           title: 'Avaliação removida',
           child: EmptyState(
@@ -38,16 +43,35 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                   abrir(context, CriarAvaliacaoScreen(avaliacaoId: a.id));
                 }
                 if (value == 'duplicar') {
-                  store.duplicar(a.id);
-                  avisar(context, 'Cópia criada nas avaliações.');
+                  try {
+                    await store.duplicar(a.id);
+                    if (context.mounted) {
+                      avisar(context, 'Cópia criada nas avaliações.');
+                    }
+                  } catch (erro) {
+                    if (context.mounted) {
+                      avisar(context,
+                          'Não foi possível duplicar a avaliação: $erro');
+                    }
+                  }
                 }
                 if (value == 'excluir') {
                   if (await confirmar(context, 'Excluir esta avaliação?',
-                      'O gabarito e as correções desta avaliação serão removidos do históico.',
+                      'O gabarito e as correções desta avaliação serão removidos do histórico.',
                       action: 'Excluir')) {
                     if (!context.mounted) return;
-                    Navigator.pop(context);
-                    store.excluir(a.id);
+                    try {
+                      await store.excluir(a.id);
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        avisar(context, 'Avaliação excluída.');
+                      }
+                    } catch (erro) {
+                      if (context.mounted) {
+                        avisar(context,
+                            'Não foi possível excluir a avaliação: $erro');
+                      }
+                    }
                   }
                 }
               },
@@ -111,7 +135,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                           child: Text('Uma folha por vez.',
-                              style: Theme.of(context).textTheme.titleMedium))
+                                  style: Theme.of(context).textTheme.titleMedium))
                     ]),
                     const SizedBox(height: 10),
                     Text(
@@ -159,8 +183,17 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                       '$corrigidas de $alunos alunos foram corrigidos. Você poderá continuar lendo folhas depois.',
                       action: 'Concluir')) {
                     if (!context.mounted) return;
-                    store.concluir(a.id);
-                    avisar(context, 'Avaliação concluída nesta sessão.');
+                    try {
+                      await store.concluir(a.id);
+                      if (context.mounted) {
+                        avisar(context, 'Avaliação concluída nesta sessão.');
+                      }
+                    } catch (erro) {
+                      if (context.mounted) {
+                        avisar(context,
+                            'Não foi possível concluir a avaliação: $erro');
+                      }
+                    }
                   }
                 },
                 icon: const Icon(Icons.task_alt_rounded),

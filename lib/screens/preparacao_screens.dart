@@ -19,7 +19,12 @@ class _MateriaisScreenState extends State<MateriaisScreen> {
   @override
   Widget build(BuildContext context) {
     final store = SessionScope.of(context);
-    final a = store.avaliacao(widget.avaliacaoId);
+    final a = store.avaliacaoOuNull(widget.avaliacaoId);
+    if (a == null) {
+      return const AppPage(
+          title: 'Materiais da avaliação',
+          child: Center(child: CircularProgressIndicator()));
+    }
     final alunos = store.alunos(a.turma);
     final aluno = alunos.where((s) => s.id == _alunoId).firstOrNull;
     return AppPage(
@@ -174,11 +179,11 @@ class FolhaRespostas extends StatelessWidget {
                                           ? AppColors.primaryDark
                                           : AppColors.textMuted),
                                   color: marcada
-                                      ? AppColors.primaryDark
-                                      : incerta
-                                          ? AppColors.textMuted
-                                              .withValues(alpha: .3)
-                                          : Colors.white),
+                                  ? AppColors.primaryDark
+                                  : incerta
+                                      ? AppColors.textMuted
+                                          .withValues(alpha: .3)
+                                      : Colors.white),
                               child: Center(
                                   child: Text(String.fromCharCode(65 + alt),
                                       style: TextStyle(
