@@ -27,7 +27,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
       return const AppPage(
           title: 'Avaliação removida',
           child: EmptyState(
-              title: 'Avaliação removida da sessão',
+              title: 'Avaliação removida',
               subtitle: 'Volte para suas avaliações.'));
     }
     final pronto = store.gabaritoPronto(a.id);
@@ -51,10 +51,11 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                   } catch (erro) {
                     if (context.mounted) {
                       avisar(context,
-                          'Não foi possível duplicar a avaliação: $erro');
+                          'Não foi possível duplicar a avaliação: ${mensagemErro(erro)}');
                     }
                   }
                 }
+                if (!context.mounted) return;
                 if (value == 'excluir') {
                   if (await confirmar(context, 'Excluir esta avaliação?',
                       'O gabarito e as correções desta avaliação serão removidos do histórico.',
@@ -69,7 +70,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                     } catch (erro) {
                       if (context.mounted) {
                         avisar(context,
-                            'Não foi possível excluir a avaliação: $erro');
+                            'Não foi possível excluir a avaliação: ${mensagemErro(erro)}');
                       }
                     }
                   }
@@ -82,7 +83,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                         value: 'duplicar', child: Text('Duplicar avaliação')),
                     PopupMenuItem(
                         value: 'excluir',
-                        child: Text('Excluir da sessão',
+                        child: Text('Excluir avaliação',
                             style: TextStyle(color: AppColors.dangerFg)))
                   ])
         ],
@@ -135,7 +136,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                           child: Text('Uma folha por vez.',
-                                  style: Theme.of(context).textTheme.titleMedium))
+                              style: Theme.of(context).textTheme.titleMedium))
                     ]),
                     const SizedBox(height: 10),
                     Text(
@@ -186,12 +187,12 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                     try {
                       await store.concluir(a.id);
                       if (context.mounted) {
-                        avisar(context, 'Avaliação concluída nesta sessão.');
+                        avisar(context, 'Avaliação concluída.');
                       }
                     } catch (erro) {
                       if (context.mounted) {
                         avisar(context,
-                            'Não foi possível concluir a avaliação: $erro');
+                            'Não foi possível concluir a avaliação: ${mensagemErro(erro)}');
                       }
                     }
                   }

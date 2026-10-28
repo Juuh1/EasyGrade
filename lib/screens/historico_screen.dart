@@ -26,7 +26,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context);
     final query = _busca.text.trim().toLowerCase();
     final lista = store.avaliacoes.where((a) {

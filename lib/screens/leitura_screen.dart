@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+import '../services/leitura_folha.dart';
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../models/correcao.dart';
@@ -5,7 +9,6 @@ import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
 import '../widgets/avaliacao_card.dart';
 import 'gabarito_screen.dart';
-import 'preparacao_screens.dart';
 import 'resultados_screen.dart';
 import 'criar_avaliacao_screen.dart';
 
@@ -86,7 +89,7 @@ class SelecionarLeituraScreen extends StatelessWidget {
                             avaliacaoId: a.id, abrirDetalhesAoSalvar: true)))),
           const SizedBox(height: 12),
           const InfoBanner(
-              'A câmera, a identificação por QR Code e o reconhecimento são simulados nesta versão.',
+              'Fotografe a folha gerada pelo EasyGrade e revise as marcações antes de confirmar.',
               icon: Icons.science_outlined),
         ]));
   }
@@ -102,190 +105,193 @@ class CapturaScreen extends StatefulWidget {
 }
 
 class _CapturaScreenState extends State<CapturaScreen> {
-  String? _alunoId;
-  bool _identificado = false, _processando = false;
-  Future<void> _ler() async {
-    final store = SessionScope.of(context);
-    final a = store.avaliacao(widget.avaliacaoId);
-    setState(() => _processando = true);
-    await Future<void>.delayed(const Duration(milliseconds: 850));
-    if (!mounted) return;
-    if (widget.gabarito) {
-      Navigator.pop(context,
-          List<int?>.generate(a.numQuestoes, (q) => q % a.numAlternativas));
-      return;
+  bool _processando = false;
+  String? _erro;
+  Uint8List? _foto;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final recuperada = await ImagePicker().retrieveLostData();
+        if (!mounted) return;
+        if (recuperada.files?.isNotEmpty == true) {
+          await _processar(recuperada.files!.first);
+        }
+        if (recuperada.exception != null && mounted) {
+          setState(() =>
+              _erro = 'Não foi possível recuperar a foto. Tente novamente.');
+        }
+      });
     }
-    final aluno = store.alunos(a.turma).firstWhere((s) => s.id == _alunoId);
-    if (store.correcoes(a.id).any((r) => r.alunoId == aluno.id)) {
-      setState(() => _processando = false);
-      if (!await confirmar(context, 'Este aluno já tem resultado',
-          'A nova leitura substituirá a anterior somente depois de você revisar e confirmar.',
-          action: 'Revisar nova leitura')) {
+  }
+
+  Future<void> _capturar(ImageSource origem) async {
+    if (_processando) return;
+    try {
+      final arquivo = await ImagePicker().pickImage(
+          source: origem, imageQuality: 95, maxWidth: 2400, maxHeight: 3200);
+      if (!mounted || arquivo == null) return;
+      await _processar(arquivo);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _processando = false;
+          _erro =
+              'Não foi possível abrir a câmera ou a imagem. Confira a permissão e tente novamente.';
+        });
+      }
+    }
+  }
+
+  Future<void> _processar(XFile arquivo) async {
+    setState(() {
+      _processando = true;
+      _erro = null;
+    });
+    final store = SessionScope.of(context);
+    try {
+      final bytes = await arquivo.readAsBytes();
+      if (!mounted) return;
+      setState(() => _foto = bytes);
+      String? codigo;
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS)) {
+        final scanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
+        try {
+          final encontrados =
+              await scanner.processImage(InputImage.fromFilePath(arquivo.path));
+          codigo = encontrados
+              .map((v) => v.rawValue)
+              .whereType<String>()
+              .where((v) => v.contains('"eg"'))
+              .firstOrNull;
+        } finally {
+          await scanner.close();
+        }
+      }
+      final leitura = await compute(
+          analisarFoto, <String, Object?>{'bytes': bytes, 'codigo': codigo});
+      if (!mounted) return;
+      final a = store.avaliacao(widget.avaliacaoId);
+      if (leitura.avaliacaoId != a.id ||
+          leitura.alternativas != a.numAlternativas ||
+          leitura.respostas.length != a.numQuestoes) {
+        throw const FormatException(
+            'Esta folha pertence a outra avaliação. Abra a avaliação indicada na folha.');
+      }
+      if (widget.gabarito) {
+        if (leitura.variante != 'A') {
+          throw const FormatException(
+              'Use o gabarito de referência da versão A.');
+        }
+        Navigator.pop(context, leitura.respostas);
         return;
       }
+      final aluno = store
+          .alunos(a.turma)
+          .where((v) => v.id == leitura.alunoId)
+          .firstOrNull;
+      if (aluno == null) {
+        throw const FormatException(
+            'A matrícula do QR não está cadastrada nesta turma. Confira os alunos.');
+      }
+      final versao = await store.carregarVariante(a.id, leitura.variante);
+      if (leitura.variante != 'A' &&
+          (versao == null || versao['alunoId'] != aluno.id)) {
+        throw const FormatException(
+            'A versão da folha não corresponde ao aluno. Gere o material novamente.');
+      }
       if (!mounted) return;
+      if (store.correcoes(a.id).any((r) => r.alunoId == aluno.id)) {
+        if (!await confirmar(context, 'Este aluno já tem resultado',
+            'Substituir o resultado anterior depois de revisar esta leitura?',
+            action: 'Revisar')) {
+          return;
+        }
+      }
+      if (!mounted) return;
+      final r = Correcao(
+          alunoId: aluno.id,
+          alunoNome: aluno.nome,
+          variante: leitura.variante,
+          respostas: leitura.respostas,
+          ordemQuestoes: (versao?['ordemQuestoes'] as List? ?? [])
+              .map((v) => (v as num).toInt())
+              .toList(),
+          ordemAlternativas: Correcao.lerOrdens(versao?['ordemAlternativas']));
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) =>
+                  RevisaoScreen(avaliacaoId: a.id, correcao: r, foto: bytes)));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _erro = e is FormatException
+            ? e.message
+            : 'Não foi possível ler a folha. Confira a conexão e fotografe novamente.');
+      }
+    } finally {
+      if (mounted) setState(() => _processando = false);
     }
-    final answers = store.leituraExemplo(a.id);
-    final r =
-        Correcao(alunoId: aluno.id, alunoNome: aluno.nome, respostas: answers);
-    Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-            builder: (_) => RevisaoScreen(avaliacaoId: a.id, correcao: r)));
   }
 
   @override
-  Widget build(BuildContext context) {
-    final store = SessionScope.of(context);
-    final a = store.avaliacao(widget.avaliacaoId);
-    final alunos = store.alunos(a.turma);
-    _alunoId ??= alunos
-            .where((s) => !store.correcoes(a.id).any((r) => r.alunoId == s.id))
-            .firstOrNull
-            ?.id ??
-        alunos.firstOrNull?.id;
-    final aluno = alunos.where((s) => s.id == _alunoId).firstOrNull;
-    final enabled = widget.gabarito || aluno != null;
-    return AppPage(
-        title: widget.gabarito ? 'Ler gabarito' : 'Ler folha de respostas',
-        bottom: ElevatedButton.icon(
-            onPressed: !enabled || _processando
-                ? null
-                : () {
-                    if (!_identificado) {
-                      setState(() => _identificado = true);
-                    } else {
-                      _ler();
-                    }
-                  },
-            icon: _processando
-                ? const SizedBox(
-                    width: 17,
-                    height: 17,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(
-                    _identificado
-                        ? Icons.document_scanner_outlined
-                        : Icons.qr_code_scanner_rounded,
-                    size: 20),
-            label: Text(_processando
-                ? 'Lendo marcações…'
-                : _identificado
-                    ? 'Ler folha de demonstração'
-                    : 'Identificar QR de demonstração')),
-        child: ListView(padding: const EdgeInsets.all(24), children: [
-          PageHeading(
-              eyebrow: 'Leitura demonstrativa',
-              title: _identificado ? 'Ler as marcações' : 'Identificar a folha',
-              subtitle: _identificado
-                  ? 'Mantenha a folha inteira visível e evite sombras sobre as marcações.'
-                  : 'O QR Code informa a avaliação, a versão da prova e a identificação do aluno.'),
-          if (!widget.gabarito && alunos.isNotEmpty) ...[
-            DropdownButtonFormField<String>(
-                initialValue: _alunoId,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                    labelText: 'Aluno da folha de demonstração',
-                    prefixIcon: Icon(Icons.person_outline_rounded)),
-                items: alunos
-                    .map((s) => DropdownMenuItem(
-                        value: s.id,
-                        child:
-                            Text(s.nome, style: const TextStyle(fontSize: 12))))
-                    .toList(),
-                onChanged: _processando
-                    ? null
-                    : (v) => setState(() {
-                          _alunoId = v;
-                          _identificado = false;
-                        })),
-            const SizedBox(height: 18)
-          ],
-          if (!enabled)
-            const InfoBanner('Adicione alunos à turma antes de ler as folhas.',
-                warning: true),
-          Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                  color: AppColors.primaryDark,
-                  borderRadius: BorderRadius.circular(26)),
-              child: Column(children: [
-                Row(children: [
-                  Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                          color: AppColors.lavender, shape: BoxShape.circle)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                      child: Text('PRÉVIA SIMULADA',
-                          style: TextStyle(
-                              color: AppColors.lavender,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.4))),
-                  const Icon(Icons.crop_free_rounded,
-                      color: AppColors.lavender, size: 19)
-                ]),
-                const SizedBox(height: 20),
-                Stack(children: [
-                  FolhaRespostas(
-                      avaliacao: a,
-                      aluno: widget.gabarito ? null : aluno,
-                      respostas: widget.gabarito
-                          ? List<int?>.generate(
-                              a.numQuestoes, (q) => q % a.numAlternativas)
-                          : store.leituraExemplo(a.id),
-                      compact: true),
-                  if (!_identificado)
-                    Positioned(
-                        top: 6,
-                        right: 6,
-                        child: Container(
-                            width: 68,
-                            height: 68,
-                            decoration: BoxDecoration(
-                                border: Border.all(
-                                    color: AppColors.primary, width: 2),
-                                borderRadius: BorderRadius.circular(12))))
-                ]),
-                const SizedBox(height: 18),
-                Text(
-                    _identificado
-                        ? '${a.codigo} · Versão A · ${widget.gabarito ? 'Gabarito' : aluno?.id ?? 'Sem aluno'}'
-                        : 'Encontre o QR Code no canto superior da folha.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 10, color: AppColors.onDarkSecondary))
-              ])),
-          const SizedBox(height: 18),
-          if (_identificado)
-            const InfoBanner(
-                'Folha identificada. Confira os dados antes de continuar.',
-                icon: Icons.check_circle_outline_rounded)
-          else
-            const InfoBanner(
-                'Esta prévia não usa a câmera do aparelho. A leitura demonstra a experiência prevista para o professor.',
-                icon: Icons.science_outlined),
-          const SizedBox(height: 18),
-          const Row(children: [
-            Icon(Icons.light_mode_outlined,
-                size: 17, color: AppColors.textMuted),
-            SizedBox(width: 8),
-            Expanded(
-                child: Text(
-                    'Boa iluminação · folha plana · todas as bordas visíveis',
-                    style: TextStyle(fontSize: 10, color: AppColors.textMuted)))
-          ]),
-        ]));
-  }
+  Widget build(BuildContext _) => AppPage(
+      title: widget.gabarito ? 'Ler gabarito' : 'Ler folha de respostas',
+      child: ListView(padding: const EdgeInsets.all(24), children: [
+        PageHeading(
+            title: widget.gabarito
+                ? 'Fotografar o gabarito'
+                : 'Fotografar a folha',
+            subtitle:
+                'Use a folha gerada pelo EasyGrade. Mantenha o QR e as quatro marcas dos cantos visíveis.'),
+        if (_foto != null)
+          ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Image.memory(_foto!, height: 300, fit: BoxFit.contain))
+        else
+          const SurfaceCard(
+              child: Padding(
+                  padding: EdgeInsets.all(36),
+                  child: Icon(Icons.document_scanner_outlined,
+                      size: 88, color: AppColors.primary))),
+        const SizedBox(height: 20),
+        if (_erro != null) InfoBanner(_erro!, warning: true),
+        if (_processando)
+          const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()))
+        else ...[
+          ElevatedButton.icon(
+              onPressed: () =>
+                  _capturar(kIsWeb ? ImageSource.gallery : ImageSource.camera),
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text(
+                  kIsWeb ? 'Escolher foto da folha' : 'Fotografar folha')),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+              onPressed: () => _capturar(ImageSource.gallery),
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Selecionar da galeria')),
+        ],
+        const SizedBox(height: 20),
+        const InfoBanner(
+            'Use boa iluminação, papel plano e bolhas preenchidas. Confira todas as respostas na revisão antes de confirmar a nota.'),
+      ]));
 }
 
 class RevisaoScreen extends StatefulWidget {
   final String avaliacaoId;
   final Correcao correcao;
+  final Uint8List? foto;
   const RevisaoScreen(
-      {super.key, required this.avaliacaoId, required this.correcao});
+      {super.key,
+      required this.avaliacaoId,
+      required this.correcao,
+      this.foto});
   @override
   State<RevisaoScreen> createState() => _RevisaoScreenState();
 }
@@ -294,24 +300,38 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
   late final List<int?> _respostas = [...widget.correcao.respostas];
   bool _soPendentes = false;
   int get _pendentes => _respostas.where((r) => r != null && r < 0).length;
-  void _salvar() {
+  bool _salvando = false;
+  Future<void> _salvar() async {
+    if (_salvando) return;
     if (_pendentes > 0) {
       avisar(context,
           'Revise $_pendentes ${_pendentes == 1 ? 'marcação sinalizada' : 'marcações sinalizadas'} antes de confirmar.');
       return;
     }
-    SessionScope.of(context).salvarCorrecao(
-        widget.avaliacaoId, widget.correcao.copyWith(respostas: _respostas));
-    Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-            builder: (_) => ResultadoAlunoScreen(
-                avaliacaoId: widget.avaliacaoId,
-                alunoId: widget.correcao.alunoId)));
+    final store = SessionScope.of(context);
+    setState(() => _salvando = true);
+    try {
+      await store.salvarCorrecao(
+          widget.avaliacaoId, widget.correcao.copyWith(respostas: _respostas));
+      if (!mounted) return;
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ResultadoAlunoScreen(
+                  avaliacaoId: widget.avaliacaoId,
+                  alunoId: widget.correcao.alunoId)));
+    } catch (e) {
+      if (mounted) {
+        avisar(context,
+            'Não foi possível salvar a correção. Confira a conexão e tente novamente.');
+      }
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final a = SessionScope.of(context).avaliacao(widget.avaliacaoId);
     final indices = List.generate(a.numQuestoes, (q) => q)
         .where((q) =>
@@ -320,10 +340,12 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
     return AppPage(
         title: 'Revisar leitura',
         bottom: ElevatedButton(
-            onPressed: _salvar,
-            child: Text(_pendentes > 0
-                ? 'Revisar $_pendentes ${_pendentes == 1 ? 'marcação' : 'marcações'} para confirmar'
-                : 'Confirmar correção')),
+            onPressed: _salvando ? null : _salvar,
+            child: Text(_salvando
+                ? 'Salvando correção…'
+                : _pendentes > 0
+                    ? 'Revisar $_pendentes ${_pendentes == 1 ? 'marcação' : 'marcações'} para confirmar'
+                    : 'Confirmar correção')),
         child: ListView(padding: const EdgeInsets.all(24), children: [
           PageHeading(
               title: 'Revisar marcações',
@@ -337,6 +359,13 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
                   ? Icons.visibility_outlined
                   : Icons.check_circle_outline_rounded,
               warning: _pendentes > 0),
+          if (widget.foto != null)
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.memory(widget.foto!,
+                        height: 280, fit: BoxFit.contain))),
           const SizedBox(height: 16),
           SwitchListTile(
               contentPadding: EdgeInsets.zero,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../data/auth_service.dart';
-import '../data/session_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
 
@@ -31,11 +30,8 @@ class _LoginScreenState extends State<LoginScreen> {
       _autenticar(() => widget.authService!.entrar(_user.text, _senha.text));
       return;
     }
-    if (_user.text.trim().toLowerCase() != 'user' || _senha.text != 'User') {
-      setState(() => _error = 'Use o acesso de demonstração: User / User.');
-      return;
-    }
-    widget.onLogin();
+    setState(() => _error =
+        'Não foi possível iniciar o acesso. Abra o aplicativo novamente.');
   }
 
   Future<void> _autenticar(Future<void> Function() operacao) async {
@@ -55,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext _) => Scaffold(
           body: SafeArea(
               child: ListView(
                   padding: const EdgeInsets.fromLTRB(28, 30, 28, 28),
@@ -192,10 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       : () => _autenticar(widget.authService!.entrarComGoogle),
                   child: const Text('Continuar com Google')),
               const SizedBox(height: 12),
-            ] else
-              const InfoBanner(
-                  'Acesso de demonstração: User / User. Os dados desta versão são fictícios.',
-                  icon: Icons.science_outlined),
+            ],
             const SizedBox(height: 12),
             TextButton(
                 onPressed: _ocupado
@@ -230,7 +223,7 @@ class _CadastroScreenState extends State<CadastroScreen> {
       _email = TextEditingController(),
       _instituicao = TextEditingController(),
       _senha = TextEditingController();
-  bool _termos = false, _obscure = true;
+  bool _obscure = true;
   bool _ocupado = false;
   String? _erro;
   @override
@@ -263,18 +256,12 @@ class _CadastroScreenState extends State<CadastroScreen> {
       }
       return;
     }
-    if (!_termos) {
-      avisar(context, 'Confirme que entendeu o acesso de demonstração.');
-      return;
-    }
-    SessionScope.of(context).atualizarPerfil(
-        _nome.text.trim(), _email.text.trim(), _instituicao.text.trim());
-    Navigator.pop(context);
-    widget.onLogin();
+    setState(() => _erro =
+        'Não foi possível iniciar o cadastro. Abra o aplicativo novamente.');
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: 'Criar conta',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         const PageHeading(title: 'Dados da conta'),
@@ -319,26 +306,10 @@ class _CadastroScreenState extends State<CadastroScreen> {
             ])),
         const SizedBox(height: 20),
         if (_erro != null) InfoBanner(_erro!, warning: true),
-        if (widget.authService == null) ...[
-          const InfoBanner(
-              'Cadastro demonstrativo. Seu perfil fica disponível nesta sessão; a senha não é armazenada.'),
-          CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _termos,
-              onChanged: (v) => setState(() => _termos = v!),
-              controlAffinity: ListTileControlAffinity.leading,
-              title: const Text(
-                  'Entendi que este é um protótipo com dados de demonstração.',
-                  style: TextStyle(fontSize: 12))),
-        ],
         const SizedBox(height: 16),
         ElevatedButton(
             onPressed: _ocupado ? null : _salvar,
-            child: Text(_ocupado
-                ? 'Criando conta…'
-                : widget.authService == null
-                    ? 'Criar conta de demonstração'
-                    : 'Criar conta')),
+            child: Text(_ocupado ? 'Criando conta…' : 'Criar conta')),
       ]));
 }
 
@@ -362,24 +333,19 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: 'Recuperar acesso',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         PageHeading(
             title: _enviado ? 'Recuperação de acesso' : 'Esqueceu sua senha?',
             subtitle: _enviado
-                ? widget.authService == null
-                    ? 'Assim será a confirmação da recuperação de acesso.'
-                    : 'Confira a caixa de entrada e o spam.'
+                ? 'Confira a caixa de entrada e o spam.'
                 : 'Informe o e-mail associado à sua conta.'),
         if (_enviado) ...[
-          EmptyState(
-              title: widget.authService == null
-                  ? 'Solicitação simulada'
-                  : 'Solicitação recebida',
-              subtitle: widget.authService == null
-                  ? 'Nenhum e-mail foi enviado nesta versão.\nPara entrar na demonstração, use User / User.'
-                  : 'Se houver uma conta com este e-mail, você receberá as instruções de recuperação.',
+          const EmptyState(
+              title: 'Solicitação recebida',
+              subtitle:
+                  'Se houver uma conta com este e-mail, você receberá as instruções de recuperação.',
               icon: Icons.mark_email_read_outlined),
           ElevatedButton(
               onPressed: () => Navigator.pop(context),
@@ -406,7 +372,10 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                         _erro = null;
                       });
                       try {
-                        await widget.authService?.recuperarSenha(_email.text);
+                        if (widget.authService == null) {
+                          throw StateError('Acesso indisponível.');
+                        }
+                        await widget.authService!.recuperarSenha(_email.text);
                         if (!mounted) return;
                         setState(() => _enviado = true);
                       } catch (erro) {
@@ -419,9 +388,6 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                     },
               child: Text(_ocupado ? 'Enviando…' : 'Solicitar recuperação')),
           const SizedBox(height: 16),
-          if (widget.authService == null)
-            const InfoBanner(
-                'Você está visualizando o fluxo demonstrativo de recuperação de senha.')
         ],
       ]));
 }

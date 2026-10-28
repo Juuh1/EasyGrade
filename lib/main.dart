@@ -19,18 +19,18 @@ import 'widgets/app_ui.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(N1App(authService: AuthService()));
+  runApp(EasyGradeApp(authService: AuthService()));
 }
 
-class N1App extends StatefulWidget {
+class EasyGradeApp extends StatefulWidget {
   final SessionStore? store;
   final AuthService? authService;
-  const N1App({super.key, this.store, this.authService});
+  const EasyGradeApp({super.key, this.store, this.authService});
   @override
-  State<N1App> createState() => _N1AppState();
+  State<EasyGradeApp> createState() => _EasyGradeAppState();
 }
 
-class _N1AppState extends State<N1App> {
+class _EasyGradeAppState extends State<EasyGradeApp> {
   late final SessionStore _store = widget.store ?? SessionStore();
   @override
   void dispose() {
@@ -79,7 +79,7 @@ class AuthenticationGate extends StatefulWidget {
 }
 
 class _AuthenticationGateState extends State<AuthenticationGate> {
-  bool _abriu = false, _autenticado = false;
+  bool _abriu = false;
   late final Stream<User?>? _conta =
       widget.authService?.auth.authStateChanges();
   @override
@@ -104,11 +104,7 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
                 store: SessionScope.of(context));
           });
     }
-    if (!_autenticado) {
-      return LoginScreen(onLogin: () => setState(() => _autenticado = true));
-    }
-    return MainNavigationShell(
-        onLogout: () => setState(() => _autenticado = false));
+    return LoginScreen(onLogin: () {});
   }
 }
 
@@ -131,7 +127,7 @@ class _SessaoAutenticadaState extends State<_SessaoAutenticada> {
   @override
   void initState() {
     super.initState();
-    widget.store.conectar(widget.service.dados);
+    widget.store.conectar(widget.service.dados, auth: widget.service);
   }
 
   @override

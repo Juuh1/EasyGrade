@@ -2,10 +2,10 @@ name: easy_grade
 description: >
   App de correção automatizada de provas
 publish_to: 'none'
-version: 0.3.0+3
+version: 1.0.0+4
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -20,6 +20,18 @@ dependencies:
   firebase_auth: ^7.0.0
   cloud_firestore: ^7.0.0
   google_sign_in: ^7.2.0
+  image_picker: ^1.2.4
+  google_mlkit_barcode_scanning: ^0.16.1
+  image: ^4.3.0
+  qr_flutter: ^4.1.0
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  excel: ^4.0.6
+  file_picker: ^13.3.0
+  share_plus: ^13.3.1
+  archive: ^3.6.1
+  zxing2: ^0.2.4
+  csv: ^8.0.0
 
 dev_dependencies:
   flutter_test:

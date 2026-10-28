@@ -1,3 +1,5 @@
+import 'package:file_picker/file_picker.dart';
+import '../services/importacao_alunos.dart';
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../models/correcao.dart';
@@ -17,6 +19,8 @@ class TurmasScreen extends StatelessWidget {
               title: 'Turmas',
               subtitle:
                   'Organize as turmas e a identificação nas folhas de respostas.'),
+          if (store.erroTurmas != null)
+            InfoBanner(store.erroTurmas!, warning: true),
           if (store.carregandoTurmas && store.turmas.isEmpty)
             const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
@@ -48,7 +52,8 @@ class TurmasScreen extends StatelessWidget {
                   abrir(context, AlunosScreen(turma: nome));
                 } catch (erro) {
                   if (context.mounted) {
-                    avisar(context, 'Não foi possível criar a turma: $erro');
+                    avisar(context,
+                        'Não foi possível criar a turma: ${mensagemErro(erro)}');
                   }
                 }
               },
@@ -100,12 +105,26 @@ class AlunosScreen extends StatelessWidget {
         title: turma,
         actions: [
           IconButton(
+              tooltip: 'Renomear turma',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () async {
+                final nome =
+                    await _novoNome(context, 'Renomear turma', 'Novo nome');
+                if (nome == null || !context.mounted) return;
+                try {
+                  await store.renomearTurma(turma, nome);
+                  if (context.mounted) Navigator.pop(context);
+                } catch (e) {
+                  if (context.mounted) {
+                    avisar(context, 'Não foi possível renomear a turma: $e');
+                  }
+                }
+              }),
+          IconButton(
               tooltip: 'Excluir turma',
               icon: const Icon(Icons.delete_outline_rounded),
               onPressed: () async {
-                if (await confirmar(
-                    context,
-                    'Excluir turma?',
+                if (await confirmar(context, 'Excluir turma?',
                     'A turma e seus alunos serão removidos.',
                     action: 'Excluir')) {
                   try {
@@ -113,7 +132,8 @@ class AlunosScreen extends StatelessWidget {
                     if (context.mounted) Navigator.pop(context);
                   } catch (erro) {
                     if (context.mounted) {
-                      avisar(context, 'Não foi possível excluir a turma: $erro');
+                      avisar(context,
+                          'Não foi possível excluir a turma: ${mensagemErro(erro)}');
                     }
                   }
                 }
@@ -165,6 +185,23 @@ class AlunosScreen extends StatelessWidget {
                                     fontSize: 10, color: AppColors.textMuted))
                           ])),
                       IconButton(
+                          tooltip: 'Editar aluno',
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          onPressed: () async {
+                            final nome = await _novoNome(
+                                context, 'Editar aluno', 'Nome do aluno');
+                            if (nome == null || !context.mounted) return;
+                            try {
+                              await store.atualizarAluno(
+                                  turma, Aluno(s.id, nome));
+                            } catch (e) {
+                              if (context.mounted) {
+                                avisar(context,
+                                    'Não foi possível atualizar o aluno.');
+                              }
+                            }
+                          }),
+                      IconButton(
                           tooltip: 'Remover aluno da turma',
                           onPressed: () async {
                             if (await confirmar(
@@ -177,7 +214,7 @@ class AlunosScreen extends StatelessWidget {
                               } catch (erro) {
                                 if (context.mounted) {
                                   avisar(context,
-                                      'Não foi possível remover o aluno: $erro');
+                                      'Não foi possível remover o aluno: ${mensagemErro(erro)}');
                                 }
                               }
                             }
@@ -209,7 +246,7 @@ class _NovoAlunoScreenState extends State<NovoAlunoScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: 'Adicionar aluno',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         PageHeading(
@@ -239,14 +276,16 @@ class _NovoAlunoScreenState extends State<NovoAlunoScreen> {
                     setState(() => _salvando = true);
                     try {
                       await SessionScope.of(context).adicionarAluno(
-                          widget.turma, Aluno(_id.text.trim(), _nome.text.trim()));
+                          widget.turma,
+                          Aluno(_id.text.trim(), _nome.text.trim()));
                       if (!mounted) return;
                       Navigator.pop(context);
                       avisar(context, 'Aluno cadastrado com sucesso.');
                     } on ArgumentError catch (e) {
                       avisar(context, e.message.toString());
                     } catch (erro) {
-                      avisar(context, 'Não foi possível cadastrar o aluno: $erro');
+                      avisar(context,
+                          'Não foi possível cadastrar o aluno: ${mensagemErro(erro)}');
                     } finally {
                       if (mounted) setState(() => _salvando = false);
                     }
@@ -281,40 +320,47 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
   }
 
   void _processarTexto(String texto) {
-    final linhas = texto.split('\n');
-    final lista = <Aluno>[];
-    String? erro;
-    for (var i = 0; i < linhas.length; i++) {
-      final linha = linhas[i].trim();
-      if (linha.isEmpty) continue;
-      final partes = linha.contains(',')
-          ? linha.split(',')
-          : (linha.contains(';') ? linha.split(';') : linha.split('\t'));
-      if (partes.length < 2) {
-        erro = 'Linha ${i + 1} inválida. Use o formato: matrícula, nome';
-        break;
-      }
-      final id = partes[0].trim();
-      final nome = partes.sublist(1).join(',').trim();
-      if (id.isEmpty || nome.isEmpty) {
-        erro = 'Linha ${i + 1} possui campos vazios.';
-        break;
-      }
-      if (lista.any((a) => a.id == id)) {
-        erro = 'Matrícula repetida na importação: $id';
-        break;
-      }
-      lista.add(Aluno(id, nome));
+    try {
+      final alunos = ImportacaoAlunos.texto(texto);
+      setState(() {
+        _erroParse = null;
+        _alunosParseados = alunos;
+      });
+    } catch (e) {
+      setState(() {
+        _erroParse =
+            e is FormatException ? e.message : 'Não foi possível ler a lista.';
+        _alunosParseados = [];
+      });
     }
-    setState(() {
-      _erroParse = erro;
-      _alunosParseados = erro == null ? lista : [];
-    });
+  }
+
+  Future<void> _abrirArquivo() async {
+    try {
+      final arquivo = await FilePicker.pickFile(
+          type: FileType.custom, allowedExtensions: ['xlsx', 'csv', 'txt']);
+      if (arquivo == null) return;
+      final alunos =
+          ImportacaoAlunos.arquivo(await arquivo.readAsBytes(), arquivo.name);
+      if (!mounted) return;
+      setState(() {
+        _erroParse = null;
+        _alunosParseados = alunos;
+        _controller.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _erroParse = e is FormatException
+            ? e.message
+            : 'Não foi possível abrir a planilha. Use Excel .xlsx ou CSV.');
+      }
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final store = SessionScope.of(context), listaTurma = store.alunos(widget.turma);
+  Widget build(BuildContext _) {
+    final store = SessionScope.of(context),
+        listaTurma = store.alunos(widget.turma);
     final novos = _alunosParseados
         .where((a) => !listaTurma.any((s) => s.id == a.id))
         .toList();
@@ -325,10 +371,16 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
           const PageHeading(
               title: 'Importar alunos',
               subtitle:
-                  'Insira ou cole uma lista com matrícula e nome para cadastrar os alunos.'),
+                  'Abra uma planilha Excel ou CSV, ou cole uma lista com matrícula e nome.'),
           const InfoBanner(
               'Formato esperado por linha: Matrícula, Nome completo\nExemplo: 2026100, Maria Souza'),
           const SizedBox(height: 16),
+          OutlinedButton.icon(
+              onPressed: _salvando ? null : _abrirArquivo,
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('Abrir Excel ou CSV')),
+          const SizedBox(height: 16),
+          if (_erroParse != null) InfoBanner(_erroParse!, warning: true),
           TextFormField(
               controller: _controller,
               enabled: !_salvando,
@@ -350,12 +402,13 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(children: [
                     Expanded(
-                        child: Text(s.nome,
-                            style: const TextStyle(fontSize: 12))),
+                        child:
+                            Text(s.nome, style: const TextStyle(fontSize: 12))),
                     Text(jaExiste ? 'Já na turma' : s.id,
                         style: TextStyle(
                             fontSize: 10,
-                            fontWeight: jaExiste ? FontWeight.w700 : FontWeight.w400,
+                            fontWeight:
+                                jaExiste ? FontWeight.w700 : FontWeight.w400,
                             color: jaExiste
                                 ? AppColors.agendadaFg
                                 : AppColors.textSecondary))
@@ -380,7 +433,8 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
                               '${novos.length} alunos importados com sucesso.');
                         } catch (erro) {
                           if (mounted) {
-                            avisar(context, 'Erro durante a importação: $erro');
+                            avisar(context,
+                                'Erro durante a importação: ${mensagemErro(erro)}');
                           }
                         } finally {
                           if (mounted) setState(() => _salvando = false);
@@ -414,7 +468,7 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
   bool _alterado = false;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context);
     final a = widget.avaliacaoId == null
         ? null
@@ -460,7 +514,7 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                                 action: 'Atualizar')) {
                           return;
                         }
-                        if (!context.mounted) return;
+                        if (!mounted) return;
                         setState(() => _salvando = true);
                         try {
                           final questoesParaSalvar = _selecionadas!
@@ -470,13 +524,13 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                               .whereType<Questao>()
                               .toList();
                           await store.salvarQuestoes(a.id, questoesParaSalvar);
-                          if (!context.mounted) return;
+                          if (!mounted) return;
                           Navigator.pop(context);
                           avisar(context, 'Questões da avaliação salvas.');
                         } catch (erro) {
-                          if (context.mounted) {
+                          if (mounted) {
                             avisar(context,
-                                'Não foi possível salvar as questões da avaliação: $erro');
+                                'Não foi possível salvar as questões da avaliação: ${mensagemErro(erro)}');
                           }
                         } finally {
                           if (mounted) setState(() => _salvando = false);
@@ -512,6 +566,8 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                   hintText: 'Buscar enunciado ou disciplina',
                   prefixIcon: Icon(Icons.search_rounded))),
           const SizedBox(height: 20),
+          if (store.erroQuestoes != null)
+            InfoBanner(store.erroQuestoes!, warning: true),
           if (store.carregandoQuestoes && store.bancoQuestoes.isEmpty)
             const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
@@ -553,7 +609,12 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                                               : _selecionadas!.remove(q.id);
                                         });
                                       })
-                          else
+                          else ...[
+                            IconButton(
+                                tooltip: 'Editar questão',
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                onPressed: () => abrir(
+                                    context, NovaQuestaoScreen(questao: q))),
                             IconButton(
                                 tooltip: 'Excluir questão',
                                 icon: const Icon(Icons.delete_outline_rounded,
@@ -566,17 +627,18 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                                       action: 'Excluir')) {
                                     try {
                                       await store.excluirQuestao(q.id);
-                                      if (context.mounted) {
+                                      if (mounted) {
                                         avisar(context, 'Questão excluída.');
                                       }
                                     } catch (erro) {
-                                      if (context.mounted) {
+                                      if (mounted) {
                                         avisar(context,
-                                            'Não foi possível excluir a questão: $erro');
+                                            'Não foi possível excluir a questão: ${mensagemErro(erro)}');
                                       }
                                     }
                                   }
                                 })
+                          ]
                         ]),
                         Text(q.enunciado,
                             style: const TextStyle(
@@ -615,7 +677,8 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
 }
 
 class NovaQuestaoScreen extends StatefulWidget {
-  const NovaQuestaoScreen({super.key});
+  final Questao? questao;
+  const NovaQuestaoScreen({super.key, this.questao});
   @override
   State<NovaQuestaoScreen> createState() => _NovaQuestaoScreenState();
 }
@@ -630,6 +693,21 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
   bool _salvando = false;
 
   @override
+  void initState() {
+    super.initState();
+    final q = widget.questao;
+    if (q != null) {
+      _enunciado.text = q.enunciado;
+      _disciplina.text = q.disciplina;
+      _quantidade = q.alternativas.length;
+      _correta = q.correta;
+      for (var i = 0; i < q.alternativas.length; i++) {
+        _alternativas[i].text = q.alternativas[i];
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _enunciado.dispose();
     _disciplina.dispose();
@@ -640,7 +718,7 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: 'Nova questão',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         const PageHeading(
@@ -711,16 +789,18 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                           : () async {
                               if (!_form.currentState!.validate()) return;
                               if (_correta == null) {
-                                avisar(context, 'Selecione a alternativa correta.');
+                                avisar(context,
+                                    'Selecione a alternativa correta.');
                                 return;
                               }
                               setState(() => _salvando = true);
                               try {
-                                await SessionScope.of(context)
-                                    .adicionarQuestao(Questao(
-                                        id: DateTime.now()
-                                            .microsecondsSinceEpoch
-                                            .toString(),
+                                await SessionScope.of(context).adicionarQuestao(
+                                    Questao(
+                                        id: widget.questao?.id ??
+                                            DateTime.now()
+                                                .microsecondsSinceEpoch
+                                                .toString(),
                                         enunciado: _enunciado.text.trim(),
                                         disciplina: _disciplina.text.trim(),
                                         alternativas: _alternativas
@@ -734,7 +814,7 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                               } catch (erro) {
                                 if (mounted) {
                                   avisar(context,
-                                      'Não foi possível salvar a questão: $erro');
+                                      'Não foi possível salvar a questão: ${mensagemErro(erro)}');
                                 }
                               } finally {
                                 if (mounted) setState(() => _salvando = false);
@@ -770,7 +850,7 @@ class AjudaScreen extends StatelessWidget {
           (
             '02',
             'Defina o gabarito',
-            'Marque as alternativas corretas ou experimente a leitura do gabarito de referência. Nesta versão, usamos a ordem da versão A.'
+            'Marque as alternativas corretas ou fotografe o gabarito de referência na versão A.'
           ),
           (
             '03',
@@ -785,7 +865,7 @@ class AjudaScreen extends StatelessWidget {
           (
             '05',
             'Use os resultados',
-            'Consulte notas e alternativas mais escolhidas para planejar a devolutiva. O relatório de notas apresenta uma prévia da planilha.'
+            'Consulte notas e alternativas mais escolhidas para planejar a devolutiva. Exporte o relatório de notas e as alternativas marcadas para Excel.'
           ),
         ].map((step) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -812,7 +892,7 @@ class AjudaScreen extends StatelessWidget {
                 ])))),
         const SizedBox(height: 12),
         const InfoBanner(
-            'N1: todas as leituras e identificações são simulações. Dados ficam em memória e são reiniciados ao fechar o app. Não há banco, envio de e-mails, câmera real ou exportação de arquivos.',
+            'Gere as folhas no app, imprima em A4 e fotografe com os quatro cantos visíveis. Revise as respostas antes de confirmar. Para salvar ou recuperar seus dados, mantenha uma conexão com a internet.',
             icon: Icons.science_outlined)
       ]));
 }

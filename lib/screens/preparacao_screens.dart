@@ -1,8 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import '../data/session_store.dart';
-import '../models/avaliacao.dart';
-import '../models/correcao.dart';
-import '../theme/app_theme.dart';
+import '../services/arquivos_service.dart';
 import '../widgets/app_ui.dart';
 import 'layout_prova_screen.dart';
 
@@ -15,250 +15,174 @@ class MateriaisScreen extends StatefulWidget {
 
 class _MateriaisScreenState extends State<MateriaisScreen> {
   String? _alunoId;
-  bool _caderno = false;
+  bool _ocupado = false;
+  Future<void> _executar(Future<void> Function() acao) async {
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
+    try {
+      await acao();
+    } catch (e) {
+      if (mounted) {
+        avisar(
+            context,
+            e is StateError
+                ? e.message
+                : 'Não foi possível gerar o arquivo. Tente novamente.');
+      }
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
+  Future<void> _pdf(bool caderno, {bool gabarito = false}) async {
+    final store = SessionScope.of(context), id = widget.avaliacaoId;
+    final alunos = _alunoId == null
+        ? store.alunos(store.avaliacao(id).turma)
+        : store
+            .alunos(store.avaliacao(id).turma)
+            .where((v) => v.id == _alunoId)
+            .toList();
+    final bytes = caderno
+        ? await ArquivosService.cadernoPDF(store, id, alunos: alunos)
+        : await ArquivosService.folhasPDF(store, id,
+            alunos: alunos, gabarito: gabarito);
+    if (!mounted) return;
+    abrir(
+        context,
+        DocumentoPDFScreen(
+            bytes: bytes,
+            nome: caderno
+                ? 'cadernos.pdf'
+                : gabarito
+                    ? 'gabarito.pdf'
+                    : 'folhas-respostas.pdf'));
+  }
+
   @override
-  Widget build(BuildContext context) {
-    final store = SessionScope.of(context);
-    final a = store.avaliacaoOuNull(widget.avaliacaoId);
+  Widget build(BuildContext _) {
+    final store = SessionScope.of(context),
+        a = store.avaliacaoOuNull(widget.avaliacaoId);
     if (a == null) {
       return const AppPage(
-          title: 'Materiais da avaliação',
-          child: Center(child: CircularProgressIndicator()));
+          title: 'Materiais',
+          child: Center(child: Text('Avaliação indisponível.')));
     }
     final alunos = store.alunos(a.turma);
-    final aluno = alunos.where((s) => s.id == _alunoId).firstOrNull;
+    if (_alunoId != null && !alunos.any((v) => v.id == _alunoId)) {
+      _alunoId = null;
+    }
     return AppPage(
         title: 'Materiais da avaliação',
         child: ListView(padding: const EdgeInsets.all(24), children: [
-          const PageHeading(
+          PageHeading(
               title: 'Materiais da avaliação',
               subtitle:
-                  'Visualize a folha de respostas e o caderno. A prova é feita no papel.'),
+                  '${a.nome}\nGere folhas identificadas e cadernos para a prova em papel.'),
+          SurfaceCard(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                const FormLabel('Alunos'),
+                DropdownButtonFormField<String>(
+                    initialValue: _alunoId,
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(
+                          value: null, child: Text('Toda a turma')),
+                      ...alunos.map((v) =>
+                          DropdownMenuItem(value: v.id, child: Text(v.nome)))
+                    ],
+                    onChanged:
+                        _ocupado ? null : (v) => setState(() => _alunoId = v)),
+                const SizedBox(height: 16),
+                Text(
+                    '${alunos.length} alunos · ${a.numQuestoes} questões · ${a.numAlternativas} alternativas'),
+              ])),
+          const SizedBox(height: 20),
+          if (_ocupado)
+            const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: CircularProgressIndicator())),
+          ActionTile(
+              icon: Icons.qr_code_2_rounded,
+              title: 'Folhas de respostas em PDF',
+              subtitle:
+                  'QR Code individual, identificação e marcas para leitura pela câmera.',
+              onTap: _ocupado ? null : () => _executar(() => _pdf(false))),
+          ActionTile(
+              icon: Icons.description_outlined,
+              title: 'Cadernos de prova em PDF',
+              subtitle:
+                  'Questões e alternativas mantidas no mesmo bloco, com as versões dos alunos.',
+              onTap: _ocupado ? null : () => _executar(() => _pdf(true))),
+          ActionTile(
+              icon: Icons.edit_document,
+              title: 'Cadernos editáveis em Word',
+              subtitle:
+                  'Arquivo .docx com nome, matrícula, questões e alternativas.',
+              onTap: _ocupado
+                  ? null
+                  : () => _executar(() async {
+                        final bytes = ArquivosService.cadernoWord(store, a.id);
+                        await ArquivosService.compartilhar(
+                            bytes,
+                            'cadernos-easygrade.docx',
+                            'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                      })),
+          ActionTile(
+              icon: Icons.fact_check_outlined,
+              title: 'Gabarito de referência em PDF',
+              subtitle: 'Versão A preenchida com as respostas corretas.',
+              onTap: _ocupado || !store.gabaritoPronto(a.id)
+                  ? null
+                  : () => _executar(() => _pdf(false, gabarito: true))),
+          const SectionHeading('Organização'),
+          ActionTile(
+              icon: Icons.shuffle_rounded,
+              title: 'Gerar versões por aluno',
+              subtitle:
+                  'Embaralhe a ordem das questões e das alternativas antes de imprimir.',
+              onTap: _ocupado
+                  ? null
+                  : () => _executar(() async {
+                        if (!await confirmar(context, 'Gerar versões?',
+                            'As versões existentes serão substituídas. Gere e imprima novamente os cadernos e as folhas depois desta ação.',
+                            action: 'Gerar')) {
+                          return;
+                        }
+                        await store.gerarVariantes(a.id);
+                        if (mounted) {
+                          avisar(context,
+                              'Versões dos alunos salvas. Os próximos arquivos usarão essas versões.');
+                        }
+                      })),
+          ActionTile(
+              icon: Icons.view_agenda_outlined,
+              title: 'Organizar páginas',
+              subtitle: 'Escolha em qual página começa cada bloco de questão.',
+              onTap: _ocupado
+                  ? null
+                  : () => abrir(context, LayoutProvaScreen(avaliacaoId: a.id))),
           const InfoBanner(
-              'Prévia de demonstração. O QR Code é ilustrativo; impressão, arquivos e embaralhamento real ficam para uma etapa futura.'),
-          const FormLabel('Identificação da folha'),
-          DropdownButtonFormField<String>(
-              key: ValueKey('${alunos.length}'),
-              initialValue: _alunoId,
-              isExpanded: true,
-              items: [
-                const DropdownMenuItem(
-                    value: null, child: Text('Folha sem nome preenchido')),
-                ...alunos.map(
-                    (s) => DropdownMenuItem(value: s.id, child: Text(s.nome)))
-              ],
-              onChanged: (v) => setState(() => _alunoId = v),
-              decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.person_outline_rounded))),
-          const SizedBox(height: 18),
-          Wrap(spacing: 8, children: [
-            ChoiceChip(
-                label: const Text('Folha de respostas'),
-                selected: !_caderno,
-                showCheckmark: false,
-                onSelected: (_) => setState(() => _caderno = false)),
-            ChoiceChip(
-                label: const Text('Caderno de prova'),
-                selected: _caderno,
-                showCheckmark: false,
-                onSelected: (_) => setState(() => _caderno = true))
-          ]),
-          const SizedBox(height: 20),
-          if (!_caderno)
-            FolhaRespostas(avaliacao: a, aluno: aluno)
-          else
-            SurfaceCard(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                  const Brand(size: 24),
-                  const SizedBox(height: 20),
-                  Text(a.nome, style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  Text(
-                      '${aluno?.nome ?? 'Nome: _____________________'}\n${a.turma} · Versão A'),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  if (store.questoes(a.id).isEmpty)
-                    const EmptyState(
-                        title: 'Adicione os enunciados',
-                        subtitle:
-                            'Use “Questões da avaliação” para selecionar as perguntas do caderno.',
-                        icon: Icons.library_books_outlined)
-                  else
-                    ...store.questoes(a.id).indexed.map((item) => Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${item.$1 + 1}. ${item.$2.enunciado}',
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14)),
-                              const SizedBox(height: 10),
-                              ...item.$2.alternativas.indexed.map((alt) => Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 4),
-                                  child: Text(
-                                      '${String.fromCharCode(65 + alt.$1)}) ${alt.$2}',
-                                      style: const TextStyle(fontSize: 12))))
-                            ])))
-                ])),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-              onPressed: () => abrir(
-                  context, _ConfiguracaoMateriaisScreen(avaliacaoId: a.id)),
-              icon: const Icon(Icons.tune_rounded, size: 18),
-              label: const Text('Opções de geração')),
+              'Imprima as folhas em A4, no tamanho original. Não recorte o QR nem as quatro marcas dos cantos. Use o PDF para a leitura automática; edite apenas os cadernos no Word.'),
         ]));
   }
 }
 
-class FolhaRespostas extends StatelessWidget {
-  final Avaliacao avaliacao;
-  final Aluno? aluno;
-  final List<int?>? respostas;
-  final bool compact;
-  const FolhaRespostas(
-      {super.key,
-      required this.avaliacao,
-      this.aluno,
-      this.respostas,
-      this.compact = false});
-  @override
-  Widget build(BuildContext context) => SurfaceCard(
-      padding: EdgeInsets.all(compact ? 16 : 22),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Row(children: [
-          Brand(size: 23),
-          Spacer(),
-          Icon(Icons.qr_code_2_rounded, size: 44, color: AppColors.primaryDark)
-        ]),
-        const SizedBox(height: 18),
-        Text(avaliacao.nome,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
-        Text(
-            '${aluno?.nome ?? 'Nome: ____________________'}\n${aluno?.id ?? 'Matrícula: _________________'} · ${avaliacao.turma}',
-            style: const TextStyle(fontSize: 10, height: 1.7)),
-        const SizedBox(height: 10),
-        const Text('Versão A · Preencha apenas uma alternativa por questão.',
-            style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
-        const SizedBox(height: 14),
-        const Divider(),
-        const SizedBox(height: 10),
-        for (var q = 0;
-            q <
-                (compact
-                    ? avaliacao.numQuestoes.clamp(1, 6)
-                    : avaliacao.numQuestoes);
-            q++)
-          Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                SizedBox(
-                    width: 30,
-                    child: Text('${q + 1}'.padLeft(2, '0'),
-                        style: const TextStyle(
-                            fontSize: 10, fontWeight: FontWeight.w700))),
-                ...List.generate(avaliacao.numAlternativas, (alt) {
-                  final resposta = respostas == null ? null : respostas![q];
-                  final incerta =
-                      resposta == -2 && alt == q % avaliacao.numAlternativas;
-                  final marcada =
-                      resposta == alt || (resposta == -1 && alt < 2);
-                  return Expanded(
-                      child: Center(
-                          child: Container(
-                              width: compact ? 21 : 27,
-                              height: compact ? 21 : 27,
-                              decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: marcada
-                                          ? AppColors.primaryDark
-                                          : AppColors.textMuted),
-                                  color: marcada
-                                  ? AppColors.primaryDark
-                                  : incerta
-                                      ? AppColors.textMuted
-                                          .withValues(alpha: .3)
-                                      : Colors.white),
-                              child: Center(
-                                  child: Text(String.fromCharCode(65 + alt),
-                                      style: TextStyle(
-                                          fontSize: compact ? 8 : 10,
-                                          color: marcada
-                                              ? Colors.white
-                                              : AppColors.textSecondary))))));
-                })
-              ])),
-        if (compact && avaliacao.numQuestoes > 6)
-          Text('… ${avaliacao.numQuestoes} questões no total',
-              textAlign: TextAlign.center, style: const TextStyle(fontSize: 9)),
-        const SizedBox(height: 14),
-        const Divider(),
-        const SizedBox(height: 10),
-        Text('${avaliacao.codigo} · QR ilustrativo · N1',
-            style: const TextStyle(fontSize: 8, color: AppColors.textMuted)),
-      ]));
-}
-
-class _ConfiguracaoMateriaisScreen extends StatefulWidget {
-  final String avaliacaoId;
-  const _ConfiguracaoMateriaisScreen({required this.avaliacaoId});
-  @override
-  State<_ConfiguracaoMateriaisScreen> createState() =>
-      _ConfiguracaoMateriaisScreenState();
-}
-
-class _ConfiguracaoMateriaisScreenState
-    extends State<_ConfiguracaoMateriaisScreen> {
-  bool _nomes = true;
+class DocumentoPDFScreen extends StatelessWidget {
+  final Uint8List bytes;
+  final String nome;
+  const DocumentoPDFScreen(
+      {super.key, required this.bytes, required this.nome});
   @override
   Widget build(BuildContext context) => AppPage(
-      title: 'Opções de geração',
-      child: ListView(padding: const EdgeInsets.all(24), children: [
-        const PageHeading(
-            title: 'Opções dos materiais',
-            subtitle:
-                'Veja como os materiais serão preparados para os alunos.'),
-        SurfaceCard(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _nomes,
-              onChanged: (v) => setState(() => _nomes = v),
-              title: const Text('Identificar cada aluno',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-              subtitle: const Text('Nome e matrícula na folha de respostas.',
-                  style: TextStyle(fontSize: 12))),
-          const Divider(),
-          const SizedBox(height: 16),
-          const Text('Formato A4 · Versão A',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          const Text(
-              'Um enunciado e suas alternativas devem permanecer juntos na mesma página.',
-              style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 16),
-          const InfoBanner(
-              'Geração de arquivos, provas embaralhadas e edição de paginação em Word são recursos previstos. Esta tela apresenta somente as opções da N1.')
-        ])),
-        const SizedBox(height: 16),
-        ActionTile(
-            icon: Icons.view_agenda_outlined,
-            title: 'Organizar páginas do caderno',
-            subtitle: 'Mova as questões inteiras entre páginas da prévia.',
-            onTap: () => abrir(
-                context, LayoutProvaScreen(avaliacaoId: widget.avaliacaoId))),
-        const SizedBox(height: 24),
-        ElevatedButton(
-            onPressed: () {
-              avisar(context,
-                  'Prévia ${_nomes ? 'individualizada' : 'sem nomes'} selecionada. Nenhum arquivo foi gerado.');
-            },
-            child: const Text('Simular preparação dos materiais'))
-      ]));
+      title: 'Visualizar e imprimir',
+      child: PdfPreview(
+        build: (_) async => bytes,
+        pdfFileName: nome,
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        allowSharing: true,
+        allowPrinting: true,
+      ));
 }

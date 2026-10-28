@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math';
+import 'auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter/material.dart';
 import '../models/avaliacao.dart';
@@ -23,9 +25,23 @@ class SessionStore extends ChangeNotifier {
   final Set<String> _disciplinasRemotas = {};
   final Map<String, List<String>> _variantesQuestoesIds = {};
 
-  String nome = 'User',
-      email = 'user@easygrade.app',
-      instituicao = 'Católica de Santa Catarina';
+  String nome = 'Professor', email = '', instituicao = '';
+  AuthService? autenticacao;
+  final Map<String, Future<void>> _turmasPendentes = {};
+  final Map<String, List<Map<String, dynamic>>> _variantes = {};
+  final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
+      _correcoesSubs = {};
+  final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
+      _materiaisSubs = {};
+  final Set<String> carregandoDetalhes = {};
+  final Map<String, Set<String>> _detalhesPendentes = {};
+  int _geracao = 0;
+  bool _descartado = false;
+  @override
+  void notifyListeners() {
+    if (!_descartado) super.notifyListeners();
+  }
+
   bool reduzirMovimento = false;
 
   FirestoreRepository? _repo;
@@ -33,8 +49,8 @@ class SessionStore extends ChangeNotifier {
   // Assinaturas do Firestore
   StreamSubscription<List<Map<String, dynamic>>>? _avaliacoesSub;
   StreamSubscription<List<Map<String, dynamic>>>? _turmasSub;
-  final Map<String, StreamSubscription<List<Map<String, dynamic>>>> _alunosSubs =
-      {};
+  final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
+      _alunosSubs = {};
   StreamSubscription<List<Map<String, dynamic>>>? _disciplinasSub;
   StreamSubscription<List<Map<String, dynamic>>>? _questoesSub;
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
@@ -53,14 +69,17 @@ class SessionStore extends ChangeNotifier {
   SessionStore();
 
   /// Conecta a sessão ao Firestore do professor autenticado.
-  void conectar(FirestoreRepository repo) {
+  void conectar(FirestoreRepository repo, {AuthService? auth}) {
     desconectar(notificar: false);
     _repo = repo;
+    autenticacao = auth;
+    final geracao = _geracao;
 
     // Módulo 1: Avaliações
     carregandoAvaliacoes = true;
     erroAvaliacoes = null;
     _avaliacoesSub = repo.acompanhar('avaliacoes').listen((docs) {
+      if (geracao != _geracao) return;
       final ordenados = [...docs]
         ..sort((a, b) => _criadoEm(b).compareTo(_criadoEm(a)));
       final lista = <Avaliacao>[];
@@ -78,12 +97,15 @@ class SessionStore extends ChangeNotifier {
       carregandoAvaliacoes = false;
 
       // Limpa assinaturas de avaliações excluídas
-      final idsRemovidos = _variantesSubs.keys
-          .where((id) => !idsAtuais.contains(id))
-          .toList();
+      final idsRemovidos =
+          _variantesSubs.keys.where((id) => !idsAtuais.contains(id)).toList();
       for (final id in idsRemovidos) {
         _variantesSubs.remove(id)?.cancel();
         _gabaritosSubs.remove(id)?.cancel();
+        _correcoesSubs.remove(id)?.cancel();
+        _materiaisSubs.remove(id)?.cancel();
+        _correcoes.remove(id);
+        _variantes.remove(id);
         _questoes.remove(id);
         _variantesQuestoesIds.remove(id);
         _gabaritos.remove(id);
@@ -93,24 +115,47 @@ class SessionStore extends ChangeNotifier {
       for (final a in lista) {
         final aId = a.id;
         if (!_variantesSubs.containsKey(aId)) {
+          carregandoDetalhes.add(aId);
+          _detalhesPendentes[aId] = {
+            'variantes',
+            'gabaritos',
+            'correcoes',
+            'materiais'
+          };
           _variantesSubs[aId] =
               repo.acompanhar('avaliacoes/$aId/variantes').listen((vDocs) {
-            final varDoc = vDocs.where((d) => d['id'] == 'A').firstOrNull ??
-                vDocs.firstOrNull;
+            if (geracao != _geracao) return;
+            _variantes[aId] = vDocs;
+            _detalheCarregado(aId, 'variantes');
+            final varDoc = vDocs.where((d) => d['id'] == 'A').firstOrNull;
             if (varDoc != null && varDoc['questoes'] is List) {
               final qIds = (varDoc['questoes'] as List)
                   .map((e) => e.toString().trim())
                   .where((e) => e.isNotEmpty)
                   .toList();
+              final itens = varDoc['itens'];
+              if (itens is List) {
+                _questoes[aId] = itens
+                    .map((v) =>
+                        Questao.fromMap(Map<String, dynamic>.from(v as Map)))
+                    .toList();
+              }
               _variantesQuestoesIds[aId] = qIds;
               _reconstruirQuestoesAvaliacao(aId);
             }
-          }, onError: (Object _) {});
+            notifyListeners();
+          }, onError: (Object _) {
+            erroAvaliacoes =
+                'Não foi possível carregar os detalhes da avaliação.';
+            notifyListeners();
+          });
         }
 
         if (!_gabaritosSubs.containsKey(aId)) {
           _gabaritosSubs[aId] =
               repo.acompanhar('avaliacoes/$aId/gabaritos').listen((gDocs) {
+            if (geracao != _geracao) return;
+            _detalheCarregado(aId, 'gabaritos');
             final gabDoc = gDocs.where((d) => d['id'] == 'A').firstOrNull ??
                 gDocs.firstOrNull;
             if (gabDoc != null && gabDoc['respostas'] is List) {
@@ -121,6 +166,44 @@ class SessionStore extends ChangeNotifier {
               notifyListeners();
             }
           }, onError: (Object _) {});
+        }
+        if (!_correcoesSubs.containsKey(aId)) {
+          _correcoesSubs[aId] =
+              repo.acompanhar('avaliacoes/$aId/correcoes').listen((docs) {
+            if (geracao != _geracao) return;
+            final lista = <Correcao>[];
+            for (final doc in docs) {
+              try {
+                final r = Correcao.fromMap(doc);
+                if (r.respostas.length == a.numQuestoes) lista.add(r);
+              } catch (_) {
+                erroAvaliacoes = 'Uma correção contém dados inválidos.';
+              }
+            }
+            _correcoes[aId] = lista;
+            _detalheCarregado(aId, 'correcoes');
+            notifyListeners();
+          }, onError: (Object _) {
+            carregandoDetalhes.remove(aId);
+            erroAvaliacoes = 'Não foi possível carregar as correções.';
+            notifyListeners();
+          });
+          _materiaisSubs[aId] =
+              repo.acompanhar('avaliacoes/$aId/materiais').listen((docs) {
+            if (geracao != _geracao) return;
+            _detalheCarregado(aId, 'materiais');
+            final layout = docs.where((v) => v['id'] == 'layout').firstOrNull;
+            if (layout?['paginas'] is List) {
+              _paginas[aId] = (layout!['paginas'] as List)
+                  .map((v) => (v as num).toInt())
+                  .toList();
+            }
+            notifyListeners();
+          }, onError: (Object _) {
+            erroAvaliacoes =
+                'Não foi possível carregar a organização das páginas.';
+            notifyListeners();
+          });
         }
       }
 
@@ -162,6 +245,11 @@ class SessionStore extends ChangeNotifier {
       for (final entry in turmasAtuais.entries) {
         final id = entry.key;
         final nome = entry.value;
+        final nomeAnterior = _turmaNomes[id];
+        if (nomeAnterior != null && nomeAnterior != nome) {
+          _turmas[nome] = _turmas.remove(nomeAnterior) ?? [];
+          _turmaIds.remove(nomeAnterior);
+        }
         _turmaIds[nome] = id;
         _turmaNomes[id] = nome;
         _turmas.putIfAbsent(nome, () => []);
@@ -232,7 +320,21 @@ class SessionStore extends ChangeNotifier {
     });
   }
 
+  void _detalheCarregado(String id, String tipo) {
+    _detalhesPendentes[id]?.remove(tipo);
+    if (_detalhesPendentes[id]?.isEmpty == true) {
+      carregandoDetalhes.remove(id);
+      notifyListeners();
+    }
+  }
+
   void _reconstruirQuestoesAvaliacao(String avaliacaoId) {
+    final versao = (_variantes[avaliacaoId] ?? [])
+        .where((v) => v['id'] == 'A')
+        .firstOrNull;
+    if (versao?['itens'] is List && (versao!['itens'] as List).isNotEmpty) {
+      return;
+    }
     final qIds = _variantesQuestoesIds[avaliacaoId];
     if (qIds == null) return;
     final lista = <Questao>[];
@@ -245,12 +347,29 @@ class SessionStore extends ChangeNotifier {
         lista.add(q);
       }
     }
-    _questoes[avaliacaoId] = lista;
+    if (lista.length == qIds.length) {
+      _questoes[avaliacaoId] = lista;
+      _gabaritos.putIfAbsent(
+          avaliacaoId,
+          () => List<int?>.generate(avaliacao(avaliacaoId).numQuestoes,
+              (i) => i < lista.length ? lista[i].correta : null));
+    }
     notifyListeners();
   }
 
   /// Desliga o Firestore e limpa os dados do professor (logout).
   void desconectar({bool notificar = true}) {
+    _geracao++;
+    for (final sub in [..._correcoesSubs.values, ..._materiaisSubs.values]) {
+      sub.cancel();
+    }
+    _correcoesSubs.clear();
+    _materiaisSubs.clear();
+    _detalhesPendentes.clear();
+    _variantes.clear();
+    _turmasPendentes.clear();
+    carregandoDetalhes.clear();
+    autenticacao = null;
     _avaliacoesSub?.cancel();
     _avaliacoesSub = null;
     _turmasSub?.cancel();
@@ -298,6 +417,7 @@ class SessionStore extends ChangeNotifier {
   @override
   void dispose() {
     desconectar(notificar: false);
+    _descartado = true;
     super.dispose();
   }
 
@@ -312,16 +432,17 @@ class SessionStore extends ChangeNotifier {
     final repo = _repo;
     if (repo == null) return;
     try {
+      erroAvaliacoes = null;
       await operacao(repo);
     } catch (erro) {
       erroAvaliacoes =
-          'Não foi possível sincronizar com o Firestore. A alteração pode não ter sido salva.';
+          'Não foi possível salvar. Confira sua conexão e tente novamente.';
       notifyListeners();
       rethrow;
     }
   }
 
-  // --- Getters ---
+  // Consultas
   List<Avaliacao> get avaliacoes => List.unmodifiable(_avaliacoes);
   Avaliacao avaliacao(String id) => _avaliacoes.firstWhere((a) => a.id == id);
   Avaliacao? avaliacaoOuNull(String id) =>
@@ -370,24 +491,15 @@ class SessionStore extends ChangeNotifier {
   List<int> paginas(String id) => List.unmodifiable(
       _paginas[id] ?? List.generate(avaliacao(id).numQuestoes, (q) => q ~/ 3));
 
-  void salvarPaginas(String id, List<int> paginas) {
+  Future<void> salvarPaginas(String id, List<int> paginas) async {
+    if (paginas.length != avaliacao(id).numQuestoes ||
+        paginas.any((v) => v < 0 || v >= 60)) {
+      throw ArgumentError('Organização de páginas inválida.');
+    }
+    await _gravar((repo) => repo.salvar('avaliacoes/$id/materiais', 'layout',
+        {'tipo': 'layout', 'paginas': paginas}));
     _paginas[id] = [...paginas];
     notifyListeners();
-  }
-
-  List<int?> leituraExemplo(String id) {
-    final a = avaliacao(id), key = gabarito(id);
-    final respostas = List<int?>.generate(
-        a.numQuestoes,
-        (q) => key[q] == null
-            ? null
-            : q % 4 == 3
-                ? (key[q]! + 1) % a.numAlternativas
-                : key[q]);
-    if (respostas.length > 2) respostas[2] = -2;
-    if (respostas.length > 4) respostas[4] = -1;
-    if (respostas.length > 7) respostas[7] = null;
-    return List.unmodifiable(respostas);
   }
 
   double media(String id) {
@@ -398,7 +510,7 @@ class SessionStore extends ChangeNotifier {
             lista.length;
   }
 
-  // --- Operações Módulo 1 (Avaliações) ---
+  // Avaliações
   Future<void> salvar(Avaliacao a) async {
     final index = _avaliacoes.indexWhere((e) => e.id == a.id);
     final backup = index >= 0 ? _avaliacoes[index] : null;
@@ -411,19 +523,23 @@ class SessionStore extends ChangeNotifier {
 
     try {
       await _gravar((repo) async {
-        await repo.salvar('avaliacoes', a.id, a.toMap());
-        if (a.disciplina.trim().isNotEmpty) {
-          final idDisc = _sanitizarId(a.disciplina);
-          if (idDisc.isNotEmpty) {
-            await repo.salvar('disciplinas', idDisc, {'nome': a.disciplina.trim()});
-          }
-        }
+        final disc = _sanitizarId(a.disciplina);
+        await repo.gravarLote({
+          'avaliacoes/${a.id}': a.toMap(),
+          if (a.disciplina.trim().isNotEmpty)
+            'disciplinas/$disc': {'nome': a.disciplina.trim()},
+        });
       });
     } catch (e) {
       if (backup == null) {
         _avaliacoes.removeWhere((e) => e.id == a.id);
       } else {
-        _avaliacoes[index] = backup;
+        final atual = _avaliacoes.indexWhere((v) => v.id == backup.id);
+        if (atual < 0) {
+          _avaliacoes.insert(0, backup);
+        } else {
+          _avaliacoes[atual] = backup;
+        }
       }
       notifyListeners();
       rethrow;
@@ -448,13 +564,26 @@ class SessionStore extends ChangeNotifier {
         await salvar(a.copyWith(status: StatusAvaliacao.agendada));
       }
     } catch (e) {
-      _gabaritos[id] = backup;
+      if (backup == null) {
+        _gabaritos.remove(id);
+      } else {
+        _gabaritos[id] = backup;
+      }
       notifyListeners();
       rethrow;
     }
   }
 
-  void salvarCorrecao(String id, Correcao r) {
+  Future<void> salvarCorrecao(String id, Correcao r) async {
+    final a = avaliacao(id);
+    if (r.respostas.length != a.numQuestoes ||
+        r.precisaRevisao ||
+        r.respostas
+            .any((v) => v != null && (v < 0 || v >= a.numAlternativas))) {
+      throw ArgumentError('Revise todas as respostas antes de salvar.');
+    }
+    await _gravar((repo) =>
+        repo.salvar('avaliacoes/$id/correcoes', r.alunoId, r.toMap()));
     final lista = _correcoes.putIfAbsent(id, () => []);
     final index = lista.indexWhere((v) => v.alunoId == r.alunoId);
     if (index >= 0) {
@@ -469,43 +598,31 @@ class SessionStore extends ChangeNotifier {
       salvar(avaliacao(id).copyWith(status: StatusAvaliacao.concluida));
 
   Future<void> excluir(String id) async {
-    final backupAvaliacao = _avaliacoes.where((a) => a.id == id).firstOrNull;
-    final backupGabarito = _gabaritos[id];
-    final backupCorrecoes = _correcoes[id];
-    final backupQuestoes = _questoes[id];
-    final backupPaginas = _paginas[id];
-    final backupVarIds = _variantesQuestoesIds[id];
-
+    await _gravar((repo) async {
+      for (final filha in [
+        'variantes',
+        'gabaritos',
+        'correcoes',
+        'materiais'
+      ]) {
+        await repo.excluirColecao('avaliacoes/$id/$filha');
+      }
+      await repo.excluir('avaliacoes', id);
+    });
     _avaliacoes.removeWhere((a) => a.id == id);
     _gabaritos.remove(id);
     _correcoes.remove(id);
     _questoes.remove(id);
     _paginas.remove(id);
     _variantesQuestoesIds.remove(id);
+    _variantes.remove(id);
     _variantesSubs.remove(id)?.cancel();
     _gabaritosSubs.remove(id)?.cancel();
+    _correcoesSubs.remove(id)?.cancel();
+    _materiaisSubs.remove(id)?.cancel();
+    _detalhesPendentes.remove(id);
+    carregandoDetalhes.remove(id);
     notifyListeners();
-
-    try {
-      await _gravar((repo) async {
-        try {
-          await repo.excluir('avaliacoes/$id/variantes', 'A');
-        } catch (_) {}
-        try {
-          await repo.excluir('avaliacoes/$id/gabaritos', 'A');
-        } catch (_) {}
-        await repo.excluir('avaliacoes', id);
-      });
-    } catch (e) {
-      if (backupAvaliacao != null) _avaliacoes.insert(0, backupAvaliacao);
-      if (backupGabarito != null) _gabaritos[id] = backupGabarito;
-      if (backupCorrecoes != null) _correcoes[id] = backupCorrecoes;
-      if (backupQuestoes != null) _questoes[id] = backupQuestoes;
-      if (backupPaginas != null) _paginas[id] = backupPaginas;
-      if (backupVarIds != null) _variantesQuestoesIds[id] = backupVarIds;
-      notifyListeners();
-      rethrow;
-    }
   }
 
   Future<void> duplicar(String id) async {
@@ -532,56 +649,112 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
-  // --- Operações Módulo 2 (Turmas e Alunos) ---
-  Future<void> adicionarTurma(String nome) async {
-    final turmaNome = nome.trim();
-    if (turmaNome.isEmpty) {
-      throw ArgumentError('O nome da turma não pode ser vazio.');
+  // Turmas e alunos
+  Future<void> adicionarTurma(String nome) {
+    final t = nome.trim();
+    if (t.isEmpty || t.length > 200) {
+      return Future.error(
+          ArgumentError('Informe um nome de até 200 caracteres.'));
     }
-    if (_turmas.containsKey(turmaNome)) {
+    if (_turmasPendentes.containsKey(t)) return _turmasPendentes[t]!;
+    if (_turmas.containsKey(t)) {
+      return Future.error(ArgumentError('Esta turma já existe.'));
+    }
+    final tarefa = () async {
+      await _gravar((repo) async {
+        final id = await repo.criar('turmas', {'nome': t});
+        _turmaIds[t] = id;
+        _turmaNomes[id] = t;
+      });
+      _turmas.putIfAbsent(t, () => []);
+      notifyListeners();
+    }();
+    _turmasPendentes[t] = tarefa;
+    return tarefa.whenComplete(() => _turmasPendentes.remove(t));
+  }
+
+  Future<void> renomearTurma(String antigo, String novo) async {
+    final nomeNovo = novo.trim();
+    if (nomeNovo.isEmpty || nomeNovo.length > 200) {
+      throw ArgumentError('Informe um nome de até 200 caracteres.');
+    }
+    if (antigo == nomeNovo) return;
+    if (_turmas.containsKey(nomeNovo)) {
       throw ArgumentError('Esta turma já existe.');
     }
-    _turmas[turmaNome] = [];
-    notifyListeners();
-
-    try {
-      await _gravar((repo) async {
-        final id = await repo.criar('turmas', {'nome': turmaNome});
-        _turmaIds[turmaNome] = id;
-        _turmaNomes[id] = turmaNome;
-      });
-    } catch (e) {
-      _turmas.remove(turmaNome);
-      notifyListeners();
-      rethrow;
+    final alunosAnteriores = [...alunos(antigo)];
+    final id = _turmaIds[antigo];
+    final avaliacoes = _avaliacoes.where((a) => a.turma == antigo).toList();
+    if (id != null) {
+      await _gravar((repo) => repo.gravarLote({
+            'turmas/$id': {'nome': nomeNovo},
+            for (final a in avaliacoes)
+              'avaliacoes/${a.id}': a.copyWith(turma: nomeNovo).toMap(),
+          }));
     }
+    final listaAnterior = _turmas.remove(antigo);
+    _turmas.putIfAbsent(nomeNovo, () => listaAnterior ?? alunosAnteriores);
+    if (id != null) {
+      _turmaIds.remove(antigo);
+      _turmaIds[nomeNovo] = id;
+      _turmaNomes[id] = nomeNovo;
+    }
+    for (var i = 0; i < _avaliacoes.length; i++) {
+      if (_avaliacoes[i].turma == antigo) {
+        _avaliacoes[i] = _avaliacoes[i].copyWith(turma: nomeNovo);
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> atualizarAluno(String turma, Aluno aluno) async {
+    if (aluno.nome.trim().isEmpty || aluno.nome.length > 200) {
+      throw ArgumentError('Confira o nome do aluno.');
+    }
+    final id = _turmaIds[turma];
+    if (id != null) {
+      await _gravar(
+          (repo) => repo.salvar('turmas/$id/alunos', aluno.id, aluno.toMap()));
+    }
+    final lista = _turmas[turma];
+    final index = lista?.indexWhere((v) => v.id == aluno.id) ?? -1;
+    if (index >= 0) lista![index] = aluno;
+    notifyListeners();
   }
 
   Future<void> removerTurma(String nome) async {
+    if (carregandoAvaliacoes) {
+      throw StateError(
+          'Aguarde o carregamento das avaliações antes de excluir a turma.');
+    }
     final turmaNome = nome.trim();
-    final backup = _turmas[turmaNome];
-    _turmas.remove(turmaNome);
-    final id = _turmaIds.remove(turmaNome);
+    if (_avaliacoes.any((a) => a.turma == turmaNome)) {
+      throw StateError(
+          'Esta turma está vinculada a uma avaliação. Exclua ou transfira as avaliações antes.');
+    }
+    final id = _turmaIds[turmaNome];
     if (id != null) {
+      await _gravar((repo) async {
+        await repo.excluirColecao('turmas/$id/alunos');
+        await repo.excluir('turmas', id);
+      });
       _turmaNomes.remove(id);
       _alunosSubs.remove(id)?.cancel();
     }
+    _turmaIds.remove(turmaNome);
+    _turmas.remove(turmaNome);
     notifyListeners();
-
-    if (id != null) {
-      try {
-        await _gravar((repo) => repo.excluir('turmas', id));
-      } catch (e) {
-        if (backup != null) _turmas[turmaNome] = backup;
-        _turmaIds[turmaNome] = id;
-        _turmaNomes[id] = turmaNome;
-        notifyListeners();
-        rethrow;
-      }
-    }
   }
 
   Future<void> adicionarAluno(String turma, Aluno aluno) async {
+    if (aluno.id.trim().isEmpty ||
+        aluno.id.contains('/') ||
+        aluno.id.length > 200 ||
+        aluno.nome.trim().isEmpty ||
+        aluno.nome.length > 200) {
+      throw ArgumentError('Confira o nome e a matrícula do aluno.');
+    }
+    await _turmasPendentes[turma];
     final lista = _turmas.putIfAbsent(turma, () => []);
     if (lista.any((a) => a.id == aluno.id)) {
       throw ArgumentError('Esta matrícula já está na turma.');
@@ -597,7 +770,7 @@ class SessionStore extends ChangeNotifier {
           _turmaIds[turma] = id;
           _turmaNomes[id] = turma;
         }
-        await repo.salvar('turmas/$id/alunos', aluno.id, aluno.toMap());
+        await repo.criar('turmas/$id/alunos', aluno.toMap(), id: aluno.id);
       });
     } catch (e) {
       _turmas[turma]?.removeWhere((a) => a.id == aluno.id);
@@ -607,8 +780,7 @@ class SessionStore extends ChangeNotifier {
   }
 
   Future<void> removerAluno(String turma, String id) async {
-    final alunoRemovido =
-        _turmas[turma]?.where((a) => a.id == id).firstOrNull;
+    final alunoRemovido = _turmas[turma]?.where((a) => a.id == id).firstOrNull;
     _turmas[turma]?.removeWhere((a) => a.id == id);
     notifyListeners();
 
@@ -624,7 +796,7 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
-  // --- Operações Módulo 3 (Banco de Questões) ---
+  // Questões
   Future<void> adicionarQuestao(Questao questao) async {
     final index = _bancoQuestoes.indexWhere((q) => q.id == questao.id);
     final backup = index >= 0 ? _bancoQuestoes[index] : null;
@@ -658,8 +830,7 @@ class SessionStore extends ChangeNotifier {
   }
 
   Future<void> excluirQuestao(String id) async {
-    final qRemovida =
-        _bancoQuestoes.where((q) => q.id == id).firstOrNull;
+    final qRemovida = _bancoQuestoes.where((q) => q.id == id).firstOrNull;
     _bancoQuestoes.removeWhere((q) => q.id == id);
     notifyListeners();
 
@@ -676,9 +847,26 @@ class SessionStore extends ChangeNotifier {
     final a = avaliacao(id);
     final qIds = selecionadas.map((q) => q.id).toList();
     final backupQuestoes = _questoes[id];
+    if (correcoes(id).isNotEmpty || carregandoDetalhes.contains(id)) {
+      throw StateError(
+          'Aguarde as correções carregarem. A composição é preservada após a primeira correção.');
+    }
+    if (selecionadas.length > a.numQuestoes ||
+        selecionadas.any((q) => q.alternativas.length != a.numAlternativas)) {
+      throw ArgumentError(
+          'As questões devem ter o mesmo formato da avaliação.');
+    }
     final backupQIds = _variantesQuestoesIds[id];
     final backupGabarito = _gabaritos[id];
 
+    _variantes[id] = [
+      ...(_variantes[id] ?? []).where((v) => v['id'] != 'A'),
+      {
+        'id': 'A',
+        'questoes': qIds,
+        'itens': selecionadas.map((q) => {...q.toMap(), 'id': q.id}).toList()
+      }
+    ];
     _questoes[id] = [...selecionadas];
     _variantesQuestoesIds[id] = qIds;
     final gab = List<int?>.generate(a.numQuestoes,
@@ -688,22 +876,27 @@ class SessionStore extends ChangeNotifier {
 
     try {
       await _gravar((repo) async {
-        await repo.salvar('avaliacoes/$id/variantes', 'A', {
-          'questoes': qIds,
-        });
-        await repo.salvar('avaliacoes/$id/gabaritos', 'A', {
-          'respostas': gab,
+        await repo.gravarLote({
+          'avaliacoes/$id/variantes/A': {
+            'questoes': qIds,
+            'itens':
+                selecionadas.map((q) => {...q.toMap(), 'id': q.id}).toList()
+          },
+          'avaliacoes/$id/gabaritos/A': {'respostas': gab},
         });
       });
 
-      if (a.status == StatusAvaliacao.rascunho &&
-          gab.every((r) => r != null)) {
+      if (a.status == StatusAvaliacao.rascunho && gab.every((r) => r != null)) {
         await salvar(a.copyWith(status: StatusAvaliacao.agendada));
       }
     } catch (e) {
       _questoes[id] = backupQuestoes ?? [];
       _variantesQuestoesIds[id] = backupQIds ?? [];
-      _gabaritos[id] = backupGabarito;
+      if (backupGabarito == null) {
+        _gabaritos.remove(id);
+      } else {
+        _gabaritos[id] = backupGabarito;
+      }
       notifyListeners();
       rethrow;
     }
@@ -719,6 +912,83 @@ class SessionStore extends ChangeNotifier {
 
   void movimento(bool value) {
     reduzirMovimento = value;
+    notifyListeners();
+  }
+
+  List<Map<String, dynamic>> variantes(String id) =>
+      List.unmodifiable(_variantes[id] ?? []);
+  Map<String, dynamic>? variante(String id, String versao) =>
+      variantes(id).where((v) => v['id'] == versao).firstOrNull;
+
+  Future<Map<String, dynamic>?> carregarVariante(
+          String id, String versao) async =>
+      variante(id, versao) ??
+      await _repo?.obter('avaliacoes/$id/variantes', versao);
+
+  Future<void> salvarPerfil(String novoNome, String novaInstituicao) async {
+    final n = novoNome.trim(), i = novaInstituicao.trim();
+    if (n.isEmpty || n.length > 200 || i.length > 200) {
+      throw ArgumentError('Confira o nome e a instituição.');
+    }
+    await _gravar((repo) => repo.salvarPerfil({
+          'nome': n,
+          'email': email,
+          'instituicao': i,
+          'reduzirMovimento': reduzirMovimento
+        }));
+    atualizarPerfil(n, email, i);
+  }
+
+  Future<void> salvarMovimento(bool valor) async {
+    await _gravar((repo) => repo.salvarPerfil({
+          'nome': nome,
+          'email': email,
+          'instituicao': instituicao,
+          'reduzirMovimento': valor
+        }));
+    movimento(valor);
+  }
+
+  Future<void> gerarVariantes(String id) async {
+    final a = avaliacao(id);
+    if (carregandoDetalhes.contains(id) || correcoes(id).isNotEmpty) {
+      throw StateError(
+          'As versões não podem ser alteradas após iniciar as correções.');
+    }
+    if (questoes(id).length != a.numQuestoes || !gabaritoPronto(id)) {
+      throw StateError(
+          'Selecione todas as questões e defina o gabarito antes de embaralhar.');
+    }
+    final alunosDaTurma = alunos(a.turma);
+    if (alunosDaTurma.isEmpty) {
+      throw StateError('Cadastre os alunos antes de gerar as versões.');
+    }
+    final versoes = <Map<String, dynamic>>[];
+    final antigos = variantes(id).where((v) => v['id'] != 'A').toList();
+    for (final antigo in antigos) {
+      await _gravar((repo) =>
+          repo.excluir('avaliacoes/$id/variantes', antigo['id'] as String));
+    }
+    final random = Random();
+    for (var i = 0; i < alunosDaTurma.length; i++) {
+      final ordem = List.generate(a.numQuestoes, (q) => q)..shuffle(random);
+      final alternativas = List.generate(a.numQuestoes,
+          (_) => List.generate(a.numAlternativas, (j) => j)..shuffle(random));
+      final v = {
+        'id': 'V${i + 1}',
+        'questoes': ordem.map((q) => questoes(id)[q].id).toList(),
+        'alunoId': alunosDaTurma[i].id,
+        'ordemQuestoes': ordem,
+        'ordemAlternativas': alternativas.map((v) => {'valores': v}).toList()
+      };
+      await _gravar((repo) =>
+          repo.salvar('avaliacoes/$id/variantes', v['id'] as String, v));
+      versoes.add(v);
+    }
+    _variantes[id] = [
+      ...variantes(id).where((v) => v['id'] == 'A'),
+      ...versoes
+    ];
     notifyListeners();
   }
 

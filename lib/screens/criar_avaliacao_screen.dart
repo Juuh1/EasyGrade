@@ -77,8 +77,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
     setState(() => _salvando = true);
     final store = SessionScope.of(context);
     final stamp = DateTime.now().microsecondsSinceEpoch.toString();
-    final old =
-        _edicao ? store.avaliacaoOuNull(widget.avaliacaoId!) : null;
+    final old = _edicao ? store.avaliacaoOuNull(widget.avaliacaoId!) : null;
     final a = Avaliacao(
         id: old?.id ?? stamp,
         codigo: old?.codigo ?? 'EG-${stamp.substring(stamp.length - 6)}',
@@ -107,7 +106,8 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
       }
     } catch (erro) {
       if (mounted) {
-        avisar(context, 'Não foi possível salvar a avaliação: $erro');
+        avisar(context,
+            'Não foi possível salvar a avaliação: ${mensagemErro(erro)}');
       }
     } finally {
       if (mounted) {
@@ -117,7 +117,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: _edicao ? 'Editar avaliação' : 'Nova avaliação',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         PageHeading(
@@ -158,8 +158,11 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                                 helperText: _temCorrecoes
                                     ? 'Turma preservada após a primeira correção.'
                                     : null),
-                            items: SessionScope.of(context)
-                                .turmas
+                            items: {
+                              ...SessionScope.of(context).turmas,
+                              if (_turma != null) _turma!
+                            }
+                                .toList()
                                 .map((t) =>
                                     DropdownMenuItem(value: t, child: Text(t)))
                                 .toList(),
@@ -258,8 +261,9 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                               height: 20,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
-                          : Text(
-                              _edicao ? 'Salvar alterações' : 'Criar avaliação')),
+                          : Text(_edicao
+                              ? 'Salvar alterações'
+                              : 'Criar avaliação')),
                   const SizedBox(height: 12),
                   const InfoBanner(
                       'As informações da avaliação são salvas com segurança no Firebase Firestore.'),

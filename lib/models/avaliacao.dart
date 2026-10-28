@@ -25,6 +25,21 @@ class Avaliacao {
   });
 
   factory Avaliacao.fromMap(Map<String, dynamic> map) {
+    if ([
+          'id',
+          'codigo',
+          'nome',
+          'disciplina',
+          'turma'
+        ].any((k) => map[k] is! String || (map[k] as String).trim().isEmpty) ||
+        map['numQuestoes'] is! num ||
+        map['numAlternativas'] is! num ||
+        (map['numQuestoes'] as num) < 1 ||
+        (map['numQuestoes'] as num) > 60 ||
+        (map['numAlternativas'] as num) < 2 ||
+        (map['numAlternativas'] as num) > 5) {
+      throw const FormatException('Avaliação com dados incompletos.');
+    }
     final dataBruta = map['data'];
     return Avaliacao(
       id: map['id'] as String? ?? '',
@@ -63,6 +78,7 @@ class Avaliacao {
     String? disciplina,
     String? turma,
     DateTime? data,
+    bool limparData = false,
     int? numQuestoes,
     int? numAlternativas,
     StatusAvaliacao? status,
@@ -73,7 +89,7 @@ class Avaliacao {
       nome: nome ?? this.nome,
       disciplina: disciplina ?? this.disciplina,
       turma: turma ?? this.turma,
-      data: data ?? this.data,
+      data: limparData ? null : data ?? this.data,
       numQuestoes: numQuestoes ?? this.numQuestoes,
       numAlternativas: numAlternativas ?? this.numAlternativas,
       status: status ?? this.status,
@@ -83,8 +99,18 @@ class Avaliacao {
 
 String _formatarDataCurta(DateTime d) {
   const meses = [
-    'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-    'jul', 'ago', 'set', 'out', 'nov', 'dez',
+    'jan',
+    'fev',
+    'mar',
+    'abr',
+    'mai',
+    'jun',
+    'jul',
+    'ago',
+    'set',
+    'out',
+    'nov',
+    'dez',
   ];
   final dia = d.day.toString().padLeft(2, '0');
   final hora = d.hour.toString().padLeft(2, '0');
