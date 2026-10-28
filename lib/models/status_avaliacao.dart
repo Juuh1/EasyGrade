@@ -15,17 +15,6 @@ extension StatusAvaliacaoX on StatusAvaliacao {
     }
   }
 
-  String get acaoPrincipal {
-    switch (this) {
-      case StatusAvaliacao.rascunho:
-        return 'Continuar edição';
-      case StatusAvaliacao.agendada:
-        return 'Editar avaliação';
-      case StatusAvaliacao.concluida:
-        return 'Ver resultados';
-    }
-  }
-
   Color get bgColor {
     switch (this) {
       case StatusAvaliacao.rascunho:

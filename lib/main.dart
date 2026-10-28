@@ -1,65 +1,214 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-
-import 'data/mock_data.dart';
-import 'screens/criar_avaliacao_screen.dart';
-import 'screens/historico_screen.dart';
-import 'screens/sucesso_avaliacao_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'data/auth_service.dart';
+import 'firebase_options.dart';
+import 'data/session_store.dart';
+import 'screens/auth_screens.dart';
 import 'screens/home_screen.dart';
+import 'screens/historico_screen.dart';
+import 'screens/leitura_screen.dart';
+import 'screens/perfil_screen.dart';
+import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_bottom_nav.dart';
+import 'widgets/app_ui.dart';
 
-void main() {
-  runApp(const N1App());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(N1App(authService: AuthService()));
 }
 
-class N1App extends StatelessWidget {
-  const N1App({super.key});
+class N1App extends StatefulWidget {
+  final SessionStore? store;
+  final AuthService? authService;
+  const N1App({super.key, this.store, this.authService});
+  @override
+  State<N1App> createState() => _N1AppState();
+}
+
+class _N1AppState extends State<N1App> {
+  late final SessionStore _store = widget.store ?? SessionStore();
+  @override
+  void dispose() {
+    if (widget.store == null) _store.dispose();
+    super.dispose();
+  }
 
   @override
+  Widget build(BuildContext context) => SessionScope(
+      store: _store,
+      child: MaterialApp(
+        title: 'EasyGrade',
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(),
+        locale: const Locale('pt', 'BR'),
+        supportedLocales: const [Locale('pt', 'BR')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        builder: (context, child) {
+          final media = MediaQuery.of(context);
+          final store = SessionScope.of(context);
+          return Container(
+              color: AppColors.pageBackground,
+              alignment: Alignment.center,
+              child: Container(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  decoration: const BoxDecoration(boxShadow: [
+                    BoxShadow(color: Color(0x16342047), blurRadius: 40)
+                  ]),
+                  child: MediaQuery(
+                      data: media.copyWith(
+                          size: Size(math.min(600, media.size.width),
+                              media.size.height),
+                          disableAnimations: store.reduzirMovimento ||
+                              media.disableAnimations),
+                      child: child!)));
+        },
+        home: AuthenticationGate(authService: widget.authService),
+      ));
+}
+
+class AuthenticationGate extends StatefulWidget {
+  final AuthService? authService;
+  const AuthenticationGate({super.key, this.authService});
+  @override
+  State<AuthenticationGate> createState() => _AuthenticationGateState();
+}
+
+class _AuthenticationGateState extends State<AuthenticationGate> {
+  bool _abriu = false, _autenticado = false;
+  late final Stream<User?>? _conta =
+      widget.authService?.auth.authStateChanges();
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Correção de Provas — Católica SC',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const MainNavigationShell(),
-    );
+    if (!_abriu) {
+      return SplashScreen(onComplete: () => setState(() => _abriu = true));
+    }
+    final service = widget.authService;
+    if (service != null) {
+      return StreamBuilder<User?>(
+          stream: _conta,
+          initialData: service.auth.currentUser,
+          builder: (context, snapshot) {
+            final user = snapshot.data;
+            if (user == null) {
+              return LoginScreen(authService: service, onLogin: () {});
+            }
+            return _SessaoAutenticada(
+                key: ValueKey(user.uid),
+                user: user,
+                service: service,
+                store: SessionScope.of(context));
+          });
+    }
+    if (!_autenticado) {
+      return LoginScreen(onLogin: () => setState(() => _autenticado = true));
+    }
+    return MainNavigationShell(
+        onLogout: () => setState(() => _autenticado = false));
   }
 }
 
-// Navegação principal
+class _SessaoAutenticada extends StatefulWidget {
+  final User user;
+  final AuthService service;
+  final SessionStore store;
+  const _SessaoAutenticada(
+      {super.key,
+      required this.user,
+      required this.service,
+      required this.store});
+  @override
+  State<_SessaoAutenticada> createState() => _SessaoAutenticadaState();
+}
+
+class _SessaoAutenticadaState extends State<_SessaoAutenticada> {
+  late Future<void> _perfil = _carregar();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.store.conectar(widget.service.dados);
+  }
+
+  @override
+  void dispose() {
+    widget.store.desconectar(notificar: false);
+    super.dispose();
+  }
+
+  Future<void> _carregar() async {
+    final perfil = await widget.service.carregarPerfil(widget.user);
+    if (!mounted) return;
+    widget.store.atualizarPerfil(perfil['nome'] as String,
+        widget.user.email ?? '', perfil['instituicao'] as String? ?? '');
+    widget.store.movimento(perfil['reduzirMovimento'] == true);
+  }
+
+  Future<void> _sair() async {
+    try {
+      await widget.service.sair();
+    } catch (erro) {
+      if (mounted) avisar(context, mensagemAutenticacao(erro));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<void>(
+      future: _perfil,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(
+              body: SafeArea(
+                  child: Center(
+                      child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                            const InfoBanner(
+                                'Não foi possível carregar seu perfil. Confira a conexão e tente novamente.',
+                                warning: true),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                                onPressed: () =>
+                                    setState(() => _perfil = _carregar()),
+                                child: const Text('Tentar novamente')),
+                            TextButton(
+                                onPressed: _sair,
+                                child: const Text('Sair da conta')),
+                          ])))));
+        }
+        return MainNavigationShell(onLogout: _sair);
+      });
+}
+
 class MainNavigationShell extends StatefulWidget {
   final int initialIndex;
-
-  const MainNavigationShell({super.key, this.initialIndex = 0});
-
+  final VoidCallback onLogout;
+  const MainNavigationShell(
+      {super.key, this.initialIndex = 0, required this.onLogout});
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
-  late int _currentIndex;
-
+  late int _index = widget.initialIndex;
+  void _navigate(int i) => setState(() => _index = i);
   @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-  }
-
-  void _onTabChanged(int index) {
-    setState(() => _currentIndex = index);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    switch (_currentIndex) {
-      case 0:
-        return HomePage(onNavigateTab: _onTabChanged);
-      case 1:
-        return CriarAvaliacaoScreen(onNavigateTab: _onTabChanged);
-      case 2:
-        return HistoricoScreen(onNavigateTab: _onTabChanged);
-      default:
-        return CriarAvaliacaoScreen(onNavigateTab: _onTabChanged);
-    }
-  }
+  Widget build(BuildContext context) => Scaffold(
+      body: IndexedStack(index: _index, children: [
+        HomePage(onNavigateTab: _navigate),
+        const HistoricoScreen(),
+        const SelecionarLeituraScreen(),
+        PerfilScreen(onLogout: widget.onLogout)
+      ]),
+      bottomNavigationBar:
+          AppBottomNav(currentIndex: _index, onTap: _navigate));
 }

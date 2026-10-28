@@ -1,4 +1,4 @@
-import 'resultado_avaliacao.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'status_avaliacao.dart';
 
 class Avaliacao {
@@ -11,7 +11,6 @@ class Avaliacao {
   final int numQuestoes;
   final int numAlternativas;
   final StatusAvaliacao status;
-  final ResultadoAvaliacao? resultado;
 
   const Avaliacao({
     required this.id,
@@ -23,13 +22,42 @@ class Avaliacao {
     required this.numQuestoes,
     required this.numAlternativas,
     required this.status,
-    this.resultado,
   });
+
+  /// Cria a avaliação a partir de um documento do Firestore (o campo `id`
+  /// é o nome do documento, injetado por `FirestoreRepository`).
+  factory Avaliacao.fromMap(Map<String, dynamic> map) {
+    final dataBruta = map['data'];
+    return Avaliacao(
+      id: map['id'] as String,
+      codigo: map['codigo'] as String,
+      nome: map['nome'] as String,
+      disciplina: map['disciplina'] as String,
+      turma: map['turma'] as String,
+      data: dataBruta is Timestamp ? dataBruta.toDate() : null,
+      numQuestoes: (map['numQuestoes'] as num).toInt(),
+      numAlternativas: (map['numAlternativas'] as num).toInt(),
+      status: StatusAvaliacao.values.firstWhere(
+        (s) => s.name == map['status'],
+        orElse: () => StatusAvaliacao.rascunho,
+      ),
+    );
+  }
+
+  /// Dados gravados no Firestore (sem `id`, que é o nome do documento).
+  Map<String, dynamic> toMap() => {
+        'codigo': codigo,
+        'nome': nome,
+        'disciplina': disciplina,
+        'turma': turma,
+        'data': data == null ? null : Timestamp.fromDate(data!),
+        'numQuestoes': numQuestoes,
+        'numAlternativas': numAlternativas,
+        'status': status.name,
+      };
 
   String get dataLabelCurta =>
       data == null ? 'Sem data definida' : _formatarDataCurta(data!);
-
-  String get subtitulo => '$numQuestoes questões · $numAlternativas alternativas';
 
   Avaliacao copyWith({
     String? id,
@@ -41,7 +69,6 @@ class Avaliacao {
     int? numQuestoes,
     int? numAlternativas,
     StatusAvaliacao? status,
-    ResultadoAvaliacao? resultado,
   }) {
     return Avaliacao(
       id: id ?? this.id,
@@ -53,49 +80,24 @@ class Avaliacao {
       numQuestoes: numQuestoes ?? this.numQuestoes,
       numAlternativas: numAlternativas ?? this.numAlternativas,
       status: status ?? this.status,
-      resultado: resultado ?? this.resultado,
     );
   }
-
-  factory Avaliacao.fromJson(Map<String, dynamic> json) {
-    return Avaliacao(
-      id: json['id'] as String,
-      codigo: json['codigo'] as String,
-      nome: json['nome'] as String,
-      disciplina: json['disciplina'] as String,
-      turma: json['turma'] as String,
-      data: json['data'] == null ? null : DateTime.parse(json['data'] as String),
-      numQuestoes: json['numQuestoes'] as int,
-      numAlternativas: json['numAlternativas'] as int,
-      status: StatusAvaliacao.values.firstWhere(
-        (s) => s.name == json['status'],
-        orElse: () => StatusAvaliacao.rascunho,
-      ),
-      resultado: json['resultado'] == null
-          ? null
-          : ResultadoAvaliacao.fromJson(
-              json['resultado'] as Map<String, dynamic>),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'codigo': codigo,
-        'nome': nome,
-        'disciplina': disciplina,
-        'turma': turma,
-        'data': data?.toIso8601String(),
-        'numQuestoes': numQuestoes,
-        'numAlternativas': numAlternativas,
-        'status': status.name,
-        'resultado': resultado?.toJson(),
-      };
 }
 
 String _formatarDataCurta(DateTime d) {
   const meses = [
-    'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-    'jul', 'ago', 'set', 'out', 'nov', 'dez',
+    'jan',
+    'fev',
+    'mar',
+    'abr',
+    'mai',
+    'jun',
+    'jul',
+    'ago',
+    'set',
+    'out',
+    'nov',
+    'dez',
   ];
   final dia = d.day.toString().padLeft(2, '0');
   final hora = d.hour.toString().padLeft(2, '0');

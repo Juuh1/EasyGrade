@@ -1,243 +1,179 @@
 import 'package:flutter/material.dart';
-
-import '../widgets/app_bottom_nav.dart';
+import '../data/session_store.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
+import '../widgets/avaliacao_card.dart';
+import 'criar_avaliacao_screen.dart';
+import 'detalhes_avaliacao_screen.dart';
+import 'apoio_screens.dart';
 
 class HomePage extends StatelessWidget {
   final ValueChanged<int> onNavigateTab;
-
-  const HomePage({
-    super.key,
-    required this.onNavigateTab,
-  });
-
+  const HomePage({super.key, required this.onNavigateTab});
   @override
   Widget build(BuildContext context) {
-    // Pegando as cores diretamente do tema do projeto
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final backgroundColor = theme.scaffoldBackgroundColor;
-    final surfaceColor = theme.colorScheme.surface;
-
-    return Scaffold(
-      backgroundColor: backgroundColor,
-
-      body: SafeArea(
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-
-            width: double.infinity,
-            height: double.infinity,
-
-            decoration: BoxDecoration(
-              color: surfaceColor,
-              borderRadius: BorderRadius.circular(9),
-            ),
-
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-
-              child: Column(
-                children: [
-                  // =====================================
-                  // CABEÇALHO
-                  // =====================================
-
-                  Container(
-                    width: double.infinity,
-                    height: 86,
-                    color: primaryColor,
-
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 25,
-                    ),
-
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          color: Colors.white,
-                          size: 38,
-                        ),
-
-                        SizedBox(width: 10),
-
-                        Text(
-                          'Olá Professor!',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // =====================================
-                  // LOGO EASYGRADE
-                  // =====================================
-
-                  Column(
-                    children: [
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Icon(
-                            Icons.description_outlined,
-                            color: primaryColor,
-                            size: 55,
-                          ),
-
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-
-                            child: Container(
-                              color: surfaceColor,
-
-                              child: Icon(
-                                Icons.check_circle_outline,
-                                color: primaryColor,
-                                size: 37,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'EasyGrade',
-
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 58),
-
-                  // =====================================
-                  // MINHAS AVALIAÇÕES
-                  // =====================================
-
-                  MenuButton(
-                    texto: 'Minhas Avaliações',
-
-                    onPressed: () {
-                      // Índice 2 = Histórico
-                      onNavigateTab(2);
-                    },
-                  ),
-
-                  const SizedBox(height: 23),
-
-                  // =====================================
-                  // NOVA AVALIAÇÃO
-                  // =====================================
-
-                  MenuButton(
-                    texto: 'Nova avaliação',
-
-                    onPressed: () {
-                      // Índice 1 = Criar Avaliação
-                      onNavigateTab(1);
-                    },
-                  ),
-
-                  const SizedBox(height: 23),
-
-                  // =====================================
-                  // MEU PERFIL
-                  // =====================================
-
-                  MenuButton(
-                    texto: 'Meu perfil',
-
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Tela de perfil ainda não disponível.',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-
-      // =====================================
-      // MENU INFERIOR DO PROJETO
-      // =====================================
-
-      bottomNavigationBar: AppBottomNav(
-        currentIndex: 0,
-        onTap: onNavigateTab,
-      ),
-    );
+    final store = SessionScope.of(context);
+    final total = store.avaliacoes
+        .fold<int>(0, (n, a) => n + store.correcoes(a.id).length);
+    return AppPage(
+        root: true,
+        title: 'Início',
+        actions: [
+          IconButton(
+              tooltip: 'Como funciona',
+              onPressed: () => abrir(context, const AjudaScreen()),
+              icon: const Icon(Icons.help_outline_rounded, size: 22)),
+          IconButton(
+              tooltip: 'Meu perfil',
+              onPressed: () => onNavigateTab(3),
+              icon: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.lavender,
+                  child: Text(
+                      store.nome.isEmpty ? 'P' : store.nome[0].toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryDark))))
+        ],
+        child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
+            children: [
+              PageHeading(title: 'Olá, ${store.nome.split(' ').first}.'),
+              Container(
+                  decoration: BoxDecoration(
+                      color: AppColors.primaryDark,
+                      borderRadius: BorderRadius.circular(26)),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(children: [
+                    Positioned(
+                        right: -30,
+                        top: -25,
+                        child: Container(
+                            width: 180,
+                            height: 180,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: AppColors.darkBorder, width: 1)))),
+                    Positioned(
+                        right: -8,
+                        top: -6,
+                        child: Container(
+                            width: 136,
+                            height: 136,
+                            decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: AppColors.darkBorder, width: 1)))),
+                    Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Corrigir pode\nser mais simples.',
+                                  style: TextStyle(
+                                      fontSize: 29,
+                                      height: 1.23,
+                                      letterSpacing: -.9,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white)),
+                              const SizedBox(height: 12),
+                              const Text(
+                                  'Leia as respostas. Revise as marcações.\nAcompanhe cada conquista.',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      height: 1.7,
+                                      color: AppColors.onDarkSecondary)),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.lavender,
+                                          foregroundColor:
+                                              AppColors.primaryDark),
+                                      onPressed: () => onNavigateTab(2),
+                                      icon: const Icon(
+                                          Icons.document_scanner_outlined,
+                                          size: 20),
+                                      label: const Text('Iniciar correção')))
+                            ])),
+                  ])),
+              const SizedBox(height: 16),
+              Row(children: [
+                Metric('${store.avaliacoes.length}', 'avaliações na sessão'),
+                const SizedBox(width: 12),
+                Metric('$total', 'folhas corrigidas',
+                    color: AppColors.softPurple)
+              ]),
+              const SectionHeading('Prepare sua próxima avaliação'),
+              ActionTile(
+                  icon: Icons.add_rounded,
+                  title: 'Criar avaliação',
+                  subtitle: 'Defina a turma, as questões e o gabarito.',
+                  onTap: () => abrir(context, const CriarAvaliacaoScreen())),
+              Row(children: [
+                Expanded(
+                    child: _Shortcut(
+                        icon: Icons.groups_outlined,
+                        label: 'Turmas e alunos',
+                        onTap: () => abrir(context, const TurmasScreen()))),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _Shortcut(
+                        icon: Icons.library_books_outlined,
+                        label: 'Banco de questões',
+                        onTap: () => abrir(context, const QuestoesScreen())))
+              ]),
+              SectionHeading('Avaliações recentes',
+                  action: 'Ver todas', onAction: () => onNavigateTab(1)),
+              if (store.avaliacoes.isEmpty)
+                const EmptyState(
+                    title: 'Nenhuma avaliação cadastrada',
+                    subtitle: 'Crie uma avaliação para começar.',
+                    icon: Icons.assignment_outlined)
+              else
+                ...store.avaliacoes.take(3).map((a) => AvaliacaoCard(
+                    avaliacao: a,
+                    onTap: () => abrir(
+                        context, DetalhesAvaliacaoScreen(avaliacaoId: a.id)))),
+              const SizedBox(height: 12),
+              const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.science_outlined,
+                    size: 13, color: AppColors.textMuted),
+                SizedBox(width: 6),
+                Text('N1 · ambiente de demonstração',
+                    style: TextStyle(fontSize: 10, color: AppColors.textMuted))
+              ]),
+            ]));
   }
 }
 
-
-// =====================================
-// BOTÃO PERSONALIZADO
-// =====================================
-
-class MenuButton extends StatelessWidget {
-  final String texto;
-  final VoidCallback onPressed;
-
-  const MenuButton({
-    super.key,
-    required this.texto,
-    required this.onPressed,
-  });
-
+class _Shortcut extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _Shortcut(
+      {required this.icon, required this.label, required this.onTap});
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SizedBox(
-      width: 400,
-      height: 52,
-
-      child: ElevatedButton(
-        onPressed: onPressed,
-
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
-          ),
-        ),
-
-        child: Text(
-          texto,
-
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: AppColors.border)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          onTap: onTap,
+          child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, color: AppColors.primary, size: 24),
+                    const SizedBox(height: 14),
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700))
+                  ]))));
 }

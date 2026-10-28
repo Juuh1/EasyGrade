@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../data/mock_data.dart';
+import '../data/session_store.dart';
 import '../models/filtro_avaliacao.dart';
 import '../models/status_avaliacao.dart';
 import '../theme/app_theme.dart';
 
-// Modal de filtros
 Future<FiltroAvaliacao?> showFiltrosBottomSheet(
   BuildContext context, {
   required FiltroAvaliacao filtroAtual,
@@ -57,6 +56,14 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
   }
 
   void _aplicarFiltros() {
+    if (_periodoDe != null &&
+        _periodoAte != null &&
+        _periodoAte!.isBefore(_periodoDe!)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'A data final deve ser igual ou posterior à data inicial.')));
+      return;
+    }
     Navigator.of(context).pop(
       widget.filtroInicial.copyWith(
         status: _status,
@@ -80,7 +87,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
       firstDate: DateTime(agora.year - 2),
       lastDate: DateTime(agora.year + 2),
     );
-    if (selecionada == null) return;
+    if (!mounted || selecionada == null) return;
     setState(() {
       if (inicio) {
         _periodoDe = selecionada;
@@ -179,7 +186,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
                       _Dropdown<String>(
                         value: _disciplina,
                         hint: 'Todas as disciplinas',
-                        items: MockData.disciplinas,
+                        items: SessionScope.of(context).disciplinas,
                         onChanged: (v) => setState(() => _disciplina = v),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -188,7 +195,7 @@ class _FiltrosBottomSheetState extends State<_FiltrosBottomSheet> {
                       _Dropdown<String>(
                         value: _turma,
                         hint: 'Todas as turmas',
-                        items: MockData.turmas,
+                        items: SessionScope.of(context).turmas,
                         onChanged: (v) => setState(() => _turma = v),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -281,12 +288,12 @@ class _Dropdown<T> extends StatelessWidget {
       initialValue: value,
       isExpanded: true,
       hint: Text(hint, style: const TextStyle(color: AppColors.textMuted)),
-      icon:
-          const Icon(Icons.keyboard_arrow_down, color: AppColors.deepNavy),
+      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primaryDark),
       decoration: InputDecoration(
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: const BorderSide(color: AppColors.deepNavy, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.primaryDark, width: 1.5),
         ),
       ),
       items: items
@@ -330,12 +337,12 @@ class _DateField extends StatelessWidget {
               suffixIcon: const Icon(
                 Icons.calendar_today_outlined,
                 size: 18,
-                color: AppColors.deepNavy,
+                color: AppColors.primaryDark,
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppRadius.sm),
                 borderSide:
-                    const BorderSide(color: AppColors.deepNavy, width: 1.5),
+                    const BorderSide(color: AppColors.primaryDark, width: 1.5),
               ),
             ),
             child: Text(
@@ -343,8 +350,7 @@ class _DateField extends StatelessWidget {
               style: TextStyle(
                 color:
                     value == null ? AppColors.textMuted : AppColors.textPrimary,
-                fontWeight:
-                    value != null ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: value != null ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ),
