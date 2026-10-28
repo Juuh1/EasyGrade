@@ -8,16 +8,16 @@ class FiltroAvaliacao {
   final DateTime? periodoDe;
   final DateTime? periodoAte;
 
-  const FiltroAvaliacao({
+  FiltroAvaliacao({
     this.busca = '',
-    this.status = const {},
+    Set<StatusAvaliacao> status = const {},
     this.disciplina,
     this.turma,
     this.periodoDe,
     this.periodoAte,
-  });
+  }) : status = Set.unmodifiable(status);
 
-  static const vazio = FiltroAvaliacao();
+  static final vazio = FiltroAvaliacao();
 
   bool get temFiltroAvancadoAtivo =>
       status.isNotEmpty ||

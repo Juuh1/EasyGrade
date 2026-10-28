@@ -1,3 +1,4 @@
+import '../data/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../theme/app_theme.dart';
@@ -23,7 +24,8 @@ class PerfilScreen extends StatelessWidget {
                 CircleAvatar(
                     radius: 31,
                     backgroundColor: AppColors.lavender,
-                    child: Text(store.nome[0].toUpperCase(),
+                    child: Text(
+                        store.nome.isEmpty ? '?' : store.nome[0].toUpperCase(),
                         style: const TextStyle(
                             color: AppColors.primaryDark,
                             fontSize: 24,
@@ -46,12 +48,12 @@ class PerfilScreen extends StatelessWidget {
           ActionTile(
               icon: Icons.edit_outlined,
               title: 'Editar perfil',
-              subtitle: 'Nome, e-mail e instituição.',
+              subtitle: 'Nome e instituição.',
               onTap: () => abrir(context, const EditarUsuarioScreen())),
           ActionTile(
               icon: Icons.lock_outline_rounded,
               title: 'Alterar senha',
-              subtitle: 'Veja o fluxo de atualização de acesso.',
+              subtitle: 'Atualize sua senha de acesso.',
               onTap: () => abrir(context, const AlterarSenhaScreen())),
           const SectionHeading('Preferências e ajuda'),
           ActionTile(
@@ -71,7 +73,7 @@ class PerfilScreen extends StatelessWidget {
               label: const Text('Sair da conta')),
           const SizedBox(height: 20),
           const Center(
-              child: Text('EasyGrade · versão 0.3.0',
+              child: Text('EasyGrade · versão 1.0.0',
                   style: TextStyle(fontSize: 10, color: AppColors.textMuted)))
         ]));
   }
@@ -88,7 +90,7 @@ class _EditarUsuarioScreenState extends State<EditarUsuarioScreen> {
   final _nome = TextEditingController(),
       _email = TextEditingController(),
       _instituicao = TextEditingController();
-  bool _loaded = false;
+  bool _loaded = false, _salvando = false;
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -110,12 +112,12 @@ class _EditarUsuarioScreenState extends State<EditarUsuarioScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: 'Editar perfil',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         const PageHeading(
             title: 'Editar perfil',
-            subtitle: 'As alterações aparecem em todas as telas nesta sessão.'),
+            subtitle: 'Mantenha seu nome e sua instituição atualizados.'),
         Form(
             key: _form,
             child: Column(children: [
@@ -126,7 +128,10 @@ class _EditarUsuarioScreenState extends State<EditarUsuarioScreen> {
               const SizedBox(height: 16),
               TextFormField(
                   controller: _email,
-                  decoration: const InputDecoration(labelText: 'E-mail'),
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                      labelText: 'E-mail da conta',
+                      helperText: 'Vinculado ao seu método de acesso.'),
                   keyboardType: TextInputType.emailAddress,
                   validator: validarEmail),
               const SizedBox(height: 16),
@@ -137,13 +142,25 @@ class _EditarUsuarioScreenState extends State<EditarUsuarioScreen> {
             ])),
         const SizedBox(height: 24),
         ElevatedButton(
-            onPressed: () {
-              if (!_form.currentState!.validate()) return;
-              SessionScope.of(context).atualizarPerfil(_nome.text.trim(),
-                  _email.text.trim(), _instituicao.text.trim());
-              Navigator.pop(context);
-              avisar(context, 'Perfil atualizado nesta sessão.');
-            },
+            onPressed: _salvando
+                ? null
+                : () async {
+                    if (!_form.currentState!.validate()) return;
+                    final store = SessionScope.of(context);
+                    setState(() => _salvando = true);
+                    try {
+                      await store.salvarPerfil(_nome.text, _instituicao.text);
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                    } catch (e) {
+                      if (mounted) {
+                        avisar(context,
+                            'Não foi possível salvar o perfil. Confira a conexão.');
+                      }
+                    } finally {
+                      if (mounted) setState(() => _salvando = false);
+                    }
+                  },
             child: const Text('Salvar alterações'))
       ]));
 }
@@ -156,29 +173,30 @@ class AlterarSenhaScreen extends StatefulWidget {
 
 class _AlterarSenhaScreenState extends State<AlterarSenhaScreen> {
   final _form = GlobalKey<FormState>();
-  final _senha = TextEditingController();
+  final _senha = TextEditingController(), _atual = TextEditingController();
+  bool _salvando = false;
   @override
   void dispose() {
     _senha.dispose();
+    _atual.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
+  Widget build(BuildContext _) => AppPage(
       title: 'Alterar senha',
       child: ListView(padding: const EdgeInsets.all(24), children: [
         const PageHeading(
             title: 'Alterar senha',
-            subtitle: 'Experimente a validação de uma nova senha.'),
+            subtitle: 'Confirme sua senha atual para definir uma nova senha.'),
         Form(
             key: _form,
             child: Column(children: [
               TextFormField(
+                  controller: _atual,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                      labelText: 'Senha atual de demonstração'),
-                  validator: (v) =>
-                      v != 'User' ? 'A senha de demonstração é User.' : null),
+                  decoration: const InputDecoration(labelText: 'Senha atual'),
+                  validator: obrigatorio),
               const SizedBox(height: 16),
               TextFormField(
                   controller: _senha,
@@ -197,16 +215,32 @@ class _AlterarSenhaScreenState extends State<AlterarSenhaScreen> {
             ])),
         const SizedBox(height: 20),
         const InfoBanner(
-            'A mudança de senha é simulada. Para entrar novamente na N1, use User / User.'),
+            'Se você acessa pelo Google, a senha é gerenciada na sua conta Google. Para recuperar um acesso por senha, use a recuperação na tela de login.'),
         const SizedBox(height: 24),
         ElevatedButton(
-            onPressed: () {
-              if (!_form.currentState!.validate()) return;
-              Navigator.pop(context);
-              avisar(context,
-                  'Fluxo de alteração validado. A senha de acesso continua User.');
-            },
-            child: const Text('Simular alteração de senha'))
+            onPressed: _salvando
+                ? null
+                : () async {
+                    if (!_form.currentState!.validate()) return;
+                    final auth = SessionScope.of(context).autenticacao;
+                    if (auth == null || !auth.usaSenha) {
+                      avisar(context,
+                          'A senha deste acesso é gerenciada na conta Google.');
+                      return;
+                    }
+                    setState(() => _salvando = true);
+                    try {
+                      await auth.alterarSenha(_atual.text, _senha.text);
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      avisar(context, 'Senha alterada.');
+                    } catch (e) {
+                      if (mounted) avisar(context, mensagemAutenticacao(e));
+                    } finally {
+                      if (mounted) setState(() => _salvando = false);
+                    }
+                  },
+            child: Text(_salvando ? 'Salvando…' : 'Alterar senha'))
       ]));
 }
 
@@ -229,7 +263,16 @@ class ConfiguracoesScreen extends StatelessWidget {
                       'Pule a animação de abertura. A preferência de acessibilidade do aparelho também é respeitada.',
                       style: TextStyle(fontSize: 12)),
                   value: store.reduzirMovimento,
-                  onChanged: store.movimento)),
+                  onChanged: (v) async {
+                    try {
+                      await store.salvarMovimento(v);
+                    } catch (e) {
+                      if (context.mounted) {
+                        avisar(
+                            context, 'Não foi possível salvar a preferência.');
+                      }
+                    }
+                  })),
           const SizedBox(height: 16),
           ActionTile(
               icon: Icons.play_circle_outline_rounded,
@@ -245,13 +288,13 @@ class ConfiguracoesScreen extends StatelessWidget {
                 Brand(size: 34),
                 SizedBox(height: 20),
                 Text(
-                    'Protótipo acadêmico de correção de avaliações objetivas em papel. Preparação, leitura demonstrativa e análise pedagógica em um só fluxo.',
+                    'Aplicativo acadêmico para preparar e corrigir avaliações objetivas em papel, com revisão das marcações e análise dos resultados.',
                     style: TextStyle(fontSize: 12)),
                 SizedBox(height: 20),
-                Eyebrow('N1 · Versão 0.2.0'),
+                Eyebrow('Versão 1.0.0'),
                 SizedBox(height: 12),
                 InfoBanner(
-                    'Dados locais de demonstração, sem persistência. A integração com banco de dados pertence à N2 e não está presente nesta versão.')
+                    'Seus dados são privados e vinculados à sua conta. A leitura usa as folhas identificadas geradas pelo EasyGrade e exige revisão antes de confirmar o resultado.')
               ]))
         ]));
   }

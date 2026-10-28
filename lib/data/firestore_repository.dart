@@ -91,6 +91,46 @@ class FirestoreRepository {
     await colecao(caminho).doc(id).delete();
   }
 
+  Future<void> gravarLote(Map<String, Map<String, dynamic>> documentos) async {
+    final refs = documentos.keys.map((caminho) {
+      final partes = caminho.split('/');
+      _validarId(partes.last);
+      return colecao(partes.take(partes.length - 1).join('/')).doc(partes.last);
+    }).toList();
+    if (refs.length > 400) {
+      throw ArgumentError('Muitos documentos na operação.');
+    }
+    await _db.runTransaction((tx) async {
+      final anteriores = <DocumentSnapshot<Map<String, dynamic>>>[];
+      for (final ref in refs) {
+        anteriores.add(await tx.get(ref));
+      }
+      final valores = documentos.values.toList();
+      for (var i = 0; i < refs.length; i++) {
+        tx.set(
+            refs[i],
+            {
+              ..._novoDocumento(valores[i]),
+              'criadoEm': anteriores[i].data()?['criadoEm'] ??
+                  FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
+      }
+    });
+  }
+
+  Future<void> excluirColecao(String caminho) async {
+    while (true) {
+      final docs = await colecao(caminho).limit(300).get();
+      if (docs.docs.isEmpty) return;
+      final lote = _db.batch();
+      for (final doc in docs.docs) {
+        lote.delete(doc.reference);
+      }
+      await lote.commit();
+    }
+  }
+
   Future<Map<String, dynamic>?> obterPerfil() async =>
       (await _perfil.get()).data();
 

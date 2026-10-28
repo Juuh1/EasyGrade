@@ -24,7 +24,7 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
   Future<void> _salvar() async {
     if (_salvando) return;
     final store = SessionScope.of(context);
-    if (_respostas == null || _respostas!.any((r) => r == null)) {
+    if (_respostas == null || _respostas!.any((r) => r == null || r < 0)) {
       avisar(context, 'Marque uma resposta correta em cada questão.');
       return;
     }
@@ -53,7 +53,8 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
                   DetalhesAvaliacaoScreen(avaliacaoId: widget.avaliacaoId)));
     } catch (erro) {
       if (mounted) {
-        avisar(context, 'Não foi possível salvar o gabarito: $erro');
+        avisar(context,
+            'Não foi possível salvar o gabarito: ${mensagemErro(erro)}');
       }
     } finally {
       if (mounted) {
@@ -63,7 +64,7 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context);
     final a = store.avaliacaoOuNull(widget.avaliacaoId);
     if (a == null) {
@@ -94,7 +95,8 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
           ActionTile(
               icon: Icons.document_scanner_outlined,
               title: 'Ler gabarito pela câmera',
-              subtitle: 'Experimente a leitura simulada de uma folha.',
+              subtitle:
+                  'Fotografe o gabarito na folha de respostas do EasyGrade.',
               onTap: _salvando
                   ? null
                   : () async {
@@ -112,7 +114,7 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
                     }),
           const SizedBox(height: 10),
           const InfoBanner(
-              'O gabarito pertence à versão A. Folhas e leitura usam a mesma ordem nesta demonstração. Questões têm peso igual; a nota vai de 0 a 10.'),
+              'Use a versão A como referência. As versões embaralhadas preservam a equivalência das respostas. Questões têm peso igual; a nota vai de 0 a 10.'),
           const SizedBox(height: 20),
           SurfaceCard(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

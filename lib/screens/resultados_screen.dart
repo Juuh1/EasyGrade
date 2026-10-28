@@ -1,3 +1,4 @@
+import '../services/arquivos_service.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
@@ -25,7 +26,7 @@ class ResultadosScreen extends StatefulWidget {
 class _ResultadosScreenState extends State<ResultadosScreen> {
   String _busca = '';
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context), id = widget.avaliacaoId;
     final a = store.avaliacao(id),
         lista = store.correcoes(id),
@@ -165,7 +166,10 @@ class _AlunoResultTile extends StatelessWidget {
                     CircleAvatar(
                         radius: 19,
                         backgroundColor: AppColors.softPurple,
-                        child: Text(correcao.alunoNome[0],
+                        child: Text(
+                            correcao.alunoNome.isEmpty
+                                ? '?'
+                                : correcao.alunoNome[0],
                             style: const TextStyle(
                                 color: AppColors.primary,
                                 fontSize: 13,
@@ -208,6 +212,7 @@ class ResultadoAlunoScreen extends StatelessWidget {
             .correcoes(avaliacaoId)
             .firstWhere((r) => r.alunoId == alunoId),
         key = store.gabarito(avaliacaoId);
+    final naFolha = r.gabaritoNaFolha(key);
     return AppPage(
         title: 'Resultado individual',
         child: ListView(padding: const EdgeInsets.all(24), children: [
@@ -270,17 +275,18 @@ class ResultadoAlunoScreen extends StatelessWidget {
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(fontSize: 11))),
                         Expanded(
-                            child: Text(respostaLabel(key[q]),
+                            child: Text(respostaLabel(naFolha[q]),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700))),
                         Icon(
-                            r.respostas[q] == key[q] && key[q] != null
+                            r.respostas[q] == naFolha[q] && naFolha[q] != null
                                 ? Icons.check_circle_outline_rounded
                                 : Icons.cancel_outlined,
                             size: 20,
-                            color: r.respostas[q] == key[q] && key[q] != null
+                            color: r.respostas[q] == naFolha[q] &&
+                                    naFolha[q] != null
                                 ? AppColors.primary
                                 : AppColors.dangerFg)
                       ])),
@@ -319,17 +325,18 @@ class EstatisticasScreen extends StatefulWidget {
 class _EstatisticasScreenState extends State<EstatisticasScreen> {
   int _questao = 0;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context), id = widget.avaliacaoId;
     final a = store.avaliacao(id),
         lista = store.correcoes(id),
         key = store.gabarito(id);
     final counts = List.generate(a.numAlternativas,
-        (alt) => lista.where((r) => r.respostas[_questao] == alt).length);
-    final brancos = lista.where((r) => r.respostas[_questao] == null).length;
+        (alt) => lista.where((r) => r.respostasBase[_questao] == alt).length);
+    final brancos =
+        lista.where((r) => r.respostasBase[_questao] == null).length;
     final corretos = lista
         .where((r) =>
-            r.respostas[_questao] == key[_questao] && key[_questao] != null)
+            r.respostasBase[_questao] == key[_questao] && key[_questao] != null)
         .length;
     final maior = counts.isEmpty ? 0 : counts.reduce(math.max);
     final populares = counts.indexed
@@ -423,8 +430,9 @@ class RelatorioScreen extends StatefulWidget {
 
 class _RelatorioScreenState extends State<RelatorioScreen> {
   bool _respostas = true;
+  bool _exportando = false;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context), id = widget.avaliacaoId;
     final a = store.avaliacao(id),
         lista = store.correcoes(id),
@@ -435,9 +443,9 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
           const PageHeading(
               title: 'Relatório de notas',
               subtitle:
-                  'Prévia da planilha de notas com as alternativas marcadas pelos alunos.'),
+                  'Confira os resultados e salve a planilha com as respostas dos alunos.'),
           const InfoBanner(
-              'A exportação Excel está representada na N1. A prévia usa os resultados desta sessão e nenhum arquivo é gerado.'),
+              'O arquivo Excel inclui notas, acertos, versão da prova e as alternativas marcadas por cada aluno.'),
           const SizedBox(height: 20),
           SurfaceCard(
               child: SwitchListTile(
@@ -478,12 +486,28 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
                       .toList())),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-              onPressed: lista.isEmpty
+              onPressed: lista.isEmpty || _exportando
                   ? null
-                  : () => avisar(context,
-                      'Exportação simulada: ${lista.length} alunos, notas${_respostas ? ' e alternativas marcadas' : ''}. Nenhum arquivo foi gerado.'),
+                  : () async {
+                      setState(() => _exportando = true);
+                      try {
+                        await ArquivosService.compartilhar(
+                            ArquivosService.relatorioExcel(store, id,
+                                respostas: _respostas),
+                            'notas-easygrade.xlsx',
+                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                      } catch (e) {
+                        if (mounted) {
+                          avisar(context,
+                              'Não foi possível exportar a planilha. Tente novamente.');
+                        }
+                      } finally {
+                        if (mounted) setState(() => _exportando = false);
+                      }
+                    },
               icon: const Icon(Icons.file_download_outlined, size: 20),
-              label: const Text('Simular exportação Excel'))
+              label:
+                  Text(_exportando ? 'Preparando arquivo…' : 'Exportar Excel'))
         ]));
   }
 }

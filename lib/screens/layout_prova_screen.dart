@@ -12,8 +12,9 @@ class LayoutProvaScreen extends StatefulWidget {
 
 class _LayoutProvaScreenState extends State<LayoutProvaScreen> {
   List<int>? _paginas;
+  bool _salvando = false;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext _) {
     final store = SessionScope.of(context);
     final a = store.avaliacao(widget.avaliacaoId),
         questoes = store.questoes(a.id);
@@ -22,19 +23,31 @@ class _LayoutProvaScreenState extends State<LayoutProvaScreen> {
     return AppPage(
         title: 'Organizar páginas',
         bottom: ElevatedButton(
-            onPressed: () {
-              store.salvarPaginas(a.id, _paginas!);
-              Navigator.pop(context);
-              avisar(context, 'Organização da prévia salva nesta sessão.');
-            },
-            child: const Text('Salvar organização da prévia')),
+            onPressed: _salvando
+                ? null
+                : () async {
+                    setState(() => _salvando = true);
+                    try {
+                      await store.salvarPaginas(a.id, _paginas!);
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                    } catch (e) {
+                      if (mounted) {
+                        avisar(
+                            context, 'Não foi possível salvar a organização.');
+                      }
+                    } finally {
+                      if (mounted) setState(() => _salvando = false);
+                    }
+                  },
+            child: const Text('Salvar organização')),
         child: ListView(padding: const EdgeInsets.all(24), children: [
           const PageHeading(
               title: 'Organizar páginas',
               subtitle:
                   'Mova a questão inteira para outra página. O enunciado e as alternativas permanecem no mesmo bloco.'),
           const InfoBanner(
-              'Prévia lógica de paginação, sem medidas de impressão. Nenhum PDF ou documento Word é gerado nesta versão.'),
+              'A organização será aplicada aos cadernos PDF e Word. Blocos que não couberem passam para a próxima página.'),
           const SectionHeading('Distribuição inicial'),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final n in [1, 2, 3])

@@ -9,6 +9,19 @@ void abrir(BuildContext context, Widget tela) =>
 void avisar(BuildContext context, String texto) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 
+String mensagemErro(Object erro) {
+  if (erro is StateError) {
+    return erro.message;
+  }
+  if (erro is ArgumentError) {
+    return erro.message?.toString() ?? 'Confira os dados informados.';
+  }
+  if (erro is FormatException) {
+    return erro.message;
+  }
+  return 'Confira a conexão e tente novamente.';
+}
+
 class Brand extends StatelessWidget {
   final double size;
   final bool wordmark;
@@ -178,7 +191,7 @@ class InfoBanner extends StatelessWidget {
 class ActionTile extends StatelessWidget {
   final IconData icon;
   final String title, subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Color tint;
   const ActionTile(
       {super.key,

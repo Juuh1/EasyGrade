@@ -78,6 +78,21 @@ class AuthService {
     }
   }
 
+  bool get usaSenha =>
+      auth.currentUser?.providerData.any((v) => v.providerId == 'password') ==
+      true;
+
+  Future<void> alterarSenha(String atual, String nova) async {
+    final user = auth.currentUser;
+    if (user?.email == null) {
+      throw StateError('Entre novamente para alterar sua senha.');
+    }
+    if (nova.length < 6) throw ArgumentError('Use pelo menos 6 caracteres.');
+    await user!.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: user.email!, password: atual));
+    await user.updatePassword(nova);
+  }
+
   Future<void> sair() async {
     await auth.signOut();
     if (!kIsWeb && _googleInicializado != null) {

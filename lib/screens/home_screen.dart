@@ -143,7 +143,7 @@ class HomePage extends StatelessWidget {
                 Icon(Icons.science_outlined,
                     size: 13, color: AppColors.textMuted),
                 SizedBox(width: 6),
-                Text('N1 · ambiente de demonstração',
+                Text('Suas avaliações e resultados',
                     style: TextStyle(fontSize: 10, color: AppColors.textMuted))
               ]),
             ]));
