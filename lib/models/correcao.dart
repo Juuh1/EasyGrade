@@ -40,6 +40,15 @@ class Correcao {
 class Aluno {
   final String id, nome;
   const Aluno(this.id, this.nome);
+
+  Map<String, dynamic> toMap() => {
+        'nome': nome,
+      };
+
+  factory Aluno.fromMap(Map<String, dynamic> map) => Aluno(
+        map['id'] as String,
+        (map['nome'] as String?) ?? '',
+      );
 }
 
 class Questao {
@@ -52,4 +61,24 @@ class Questao {
       required this.disciplina,
       required this.alternativas,
       required this.correta});
+
+  Map<String, dynamic> toMap() => {
+        'enunciado': enunciado,
+        'disciplina': disciplina,
+        'alternativas': alternativas,
+        'correta': correta,
+      };
+
+  factory Questao.fromMap(Map<String, dynamic> map) {
+    return Questao(
+      id: map['id'] as String,
+      enunciado: (map['enunciado'] as String?) ?? '',
+      disciplina: (map['disciplina'] as String?) ?? '',
+      alternativas: (map['alternativas'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      correta: (map['correta'] as num?)?.toInt() ?? 0,
+    );
+  }
 }

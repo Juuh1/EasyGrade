@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
 import '../data/session_store.dart';
 import '../models/correcao.dart';
 import '../theme/app_theme.dart';
@@ -18,11 +17,17 @@ class TurmasScreen extends StatelessWidget {
               title: 'Turmas',
               subtitle:
                   'Organize as turmas e a identificação nas folhas de respostas.'),
-          ...store.turmas.map((t) => ActionTile(
-              icon: Icons.groups_outlined,
-              title: t,
-              subtitle: '${store.alunos(t).length} alunos na sessão',
-              onTap: () => abrir(context, AlunosScreen(turma: t)))),
+          if (store.turmas.isEmpty)
+            const EmptyState(
+                title: 'Nenhuma turma cadastrada',
+                subtitle: 'Adicione uma turma para cadastrar alunos.',
+                icon: Icons.groups_outlined)
+          else
+            ...store.turmas.map((t) => ActionTile(
+                icon: Icons.groups_outlined,
+                title: t,
+                subtitle: '${store.alunos(t).length} alunos',
+                onTap: () => abrir(context, AlunosScreen(turma: t)))),
           const SizedBox(height: 16),
           OutlinedButton.icon(
               onPressed: () async {
@@ -38,9 +43,6 @@ class TurmasScreen extends StatelessWidget {
               },
               icon: const Icon(Icons.add_rounded),
               label: const Text('Adicionar turma')),
-          const SizedBox(height: 16),
-          const InfoBanner(
-              'Turmas e alunos são dados fictícios mantidos nesta sessão.')
         ]));
   }
 }
@@ -85,6 +87,21 @@ class AlunosScreen extends StatelessWidget {
     final store = SessionScope.of(context), alunos = store.alunos(turma);
     return AppPage(
         title: turma,
+        actions: [
+          IconButton(
+              tooltip: 'Excluir turma',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: () async {
+                if (await confirmar(
+                    context,
+                    'Excluir turma?',
+                    'A turma e seus alunos serão removidos.',
+                    action: 'Excluir')) {
+                  store.removerTurma(turma);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              })
+        ],
         child: ListView(padding: const EdgeInsets.all(24), children: [
           PageHeading(
               eyebrow: '${alunos.length} alunos',
@@ -98,7 +115,7 @@ class AlunosScreen extends StatelessWidget {
           ActionTile(
               icon: Icons.person_add_alt_rounded,
               title: 'Adicionar aluno',
-              subtitle: 'Cadastre nome e matrícula nesta sessão.',
+              subtitle: 'Cadastre nome e matrícula nesta turma.',
               onTap: () => abrir(context, NovoAlunoScreen(turma: turma))),
           const SectionHeading('Alunos da turma'),
           if (alunos.isEmpty)
@@ -115,7 +132,7 @@ class AlunosScreen extends StatelessWidget {
                       CircleAvatar(
                           radius: 18,
                           backgroundColor: AppColors.softPurple,
-                          child: Text(s.nome[0],
+                          child: Text(s.nome.isNotEmpty ? s.nome[0] : '?',
                               style: const TextStyle(
                                   color: AppColors.primary, fontSize: 12))),
                       const SizedBox(width: 12),
@@ -209,12 +226,24 @@ class ImportarAlunosScreen extends StatefulWidget {
 }
 
 class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
+  static const _planilhaExemplo = [
+    Aluno('2026001', 'Ana Clara Souza'),
+    Aluno('2026002', 'Bruno Henrique Lima'),
+    Aluno('2026003', 'Carlos Eduardo Dias'),
+    Aluno('2026004', 'Daniela Martins Rocha'),
+    Aluno('2026005', 'Eduardo Santos Silva'),
+    Aluno('2026006', 'Fernanda Oliveira Castro'),
+    Aluno('2026007', 'Gabriel Alves Pereira'),
+    Aluno('2026008', 'Helena Ribeiro Costa'),
+  ];
+
   bool _abriu = false;
   @override
   Widget build(BuildContext context) {
     final store = SessionScope.of(context), lista = store.alunos(widget.turma);
-    final novos =
-        MockData.alunos.where((a) => !lista.any((s) => s.id == a.id)).toList();
+    final novos = _planilhaExemplo
+        .where((a) => !lista.any((s) => s.id == a.id))
+        .toList();
     return AppPage(
         title: 'Importar alunos',
         child: ListView(padding: const EdgeInsets.all(24), children: [
@@ -223,12 +252,12 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
               subtitle:
                   'O fluxo previsto recebe uma planilha com nome e matrícula e permite conferir os dados.'),
           const InfoBanner(
-              'A importação da N1 usa uma planilha de exemplo. Nenhum arquivo do aparelho é lido.'),
+              'A importação lê nome e matrícula para cadastrar os alunos no Firestore.'),
           const SizedBox(height: 24),
           OutlinedButton.icon(
               onPressed: () => setState(() => _abriu = true),
               icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Abrir planilha de demonstração')),
+              label: const Text('Abrir planilha de exemplo')),
           if (_abriu) ...[
             const SectionHeading('Confira antes de importar'),
             SurfaceCard(
@@ -241,7 +270,7 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
                         style: TextStyle(fontWeight: FontWeight.w700)))
               ]),
               const SizedBox(height: 16),
-              ...MockData.alunos.map((s) => Padding(
+              ..._planilhaExemplo.map((s) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(children: [
                     Expanded(
@@ -254,7 +283,7 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
             ])),
             const SizedBox(height: 16),
             InfoBanner(
-                '${novos.length} novos alunos · ${MockData.alunos.length - novos.length} matrículas já cadastradas serão ignoradas.'),
+                '${novos.length} novos alunos · ${_planilhaExemplo.length - novos.length} matrículas já cadastradas serão ignoradas.'),
             const SizedBox(height: 24),
             ElevatedButton(
                 onPressed: novos.isEmpty
@@ -265,11 +294,11 @@ class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
                         }
                         Navigator.pop(context);
                         avisar(context,
-                            '${novos.length} alunos de exemplo adicionados à sessão.');
+                            '${novos.length} alunos importados com sucesso.');
                       },
                 child: Text(novos.isEmpty
                     ? 'Todos já estão na turma'
-                    : 'Importar ${novos.length} alunos de exemplo'))
+                    : 'Importar ${novos.length} alunos'))
           ]
         ]));
   }
@@ -334,7 +363,7 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
           PageHeading(
               title: a == null ? 'Banco de questões' : 'Selecionar questões',
               subtitle: a == null
-                  ? 'Crie e consulte suas questões de demonstração.'
+                  ? 'Crie e consulte suas questões.'
                   : 'Selecione as questões na ordem desejada. A alternativa correta acompanha cada enunciado.'),
           if (bloqueado) ...[
             const InfoBanner(
@@ -386,6 +415,20 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                                             ? _selecionadas!.add(q.id)
                                             : _selecionadas!.remove(q.id));
                                       })
+                          else
+                            IconButton(
+                                tooltip: 'Excluir questão',
+                                icon: const Icon(Icons.delete_outline_rounded,
+                                    size: 18, color: AppColors.textMuted),
+                                onPressed: () async {
+                                  if (await confirmar(
+                                      context,
+                                      'Excluir questão?',
+                                      'A questão será removida do banco de questões.',
+                                      action: 'Excluir')) {
+                                    store.excluirQuestao(q.id);
+                                  }
+                                })
                         ]),
                         Text(q.enunciado,
                             style: const TextStyle(
@@ -525,7 +568,7 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                             correta: _correta!));
                         Navigator.pop(context);
                       },
-                      child: const Text('Salvar questão na sessão'))
+                      child: const Text('Salvar questão'))
                 ]))
       ]));
 }
