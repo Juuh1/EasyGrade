@@ -19,9 +19,12 @@ class GabaritoScreen extends StatefulWidget {
 class _GabaritoScreenState extends State<GabaritoScreen> {
   List<int?>? _respostas;
   bool _alterado = false;
+  bool _salvando = false;
+
   Future<void> _salvar() async {
+    if (_salvando) return;
     final store = SessionScope.of(context);
-    if (_respostas!.any((r) => r == null)) {
+    if (_respostas == null || _respostas!.any((r) => r == null)) {
       avisar(context, 'Marque uma resposta correta em cada questão.');
       return;
     }
@@ -33,30 +36,56 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
       }
       if (!mounted) return;
     }
-    store.salvarGabarito(widget.avaliacaoId, _respostas!);
-    if (!widget.abrirDetalhesAoSalvar) {
-      Navigator.pop(context);
-      avisar(context, 'Gabarito atualizado nesta sessão.');
-      return;
+
+    setState(() => _salvando = true);
+    try {
+      await store.salvarGabarito(widget.avaliacaoId, _respostas!);
+      if (!mounted) return;
+      if (!widget.abrirDetalhesAoSalvar) {
+        Navigator.pop(context);
+        avisar(context, 'Gabarito salvo com sucesso.');
+        return;
+      }
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) =>
+                  DetalhesAvaliacaoScreen(avaliacaoId: widget.avaliacaoId)));
+    } catch (erro) {
+      if (mounted) {
+        avisar(context, 'Não foi possível salvar o gabarito: $erro');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _salvando = false);
+      }
     }
-    Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-            builder: (_) =>
-                DetalhesAvaliacaoScreen(avaliacaoId: widget.avaliacaoId)));
   }
 
   @override
   Widget build(BuildContext context) {
     final store = SessionScope.of(context);
-    final a = store.avaliacao(widget.avaliacaoId);
-    _respostas ??= [...store.gabarito(a.id)];
-    final preenchidas = _respostas!.where((r) => r != null).length;
+    final a = store.avaliacaoOuNull(widget.avaliacaoId);
+    if (a == null) {
+      return const AppPage(
+          title: 'Gabarito de referência',
+          child: Center(child: CircularProgressIndicator()));
+    }
+    if (!_alterado) {
+      _respostas = [...store.gabarito(a.id)];
+    }
+    final preenchidas = _respostas?.where((r) => r != null).length ?? 0;
     return AppPage(
         title: 'Gabarito de referência',
         bottom: ElevatedButton(
-            onPressed: _salvar,
-            child: Text('Salvar gabarito · $preenchidas/${a.numQuestoes}')),
+            onPressed: _salvando ? null : _salvar,
+            child: _salvando
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : Text('Salvar gabarito · $preenchidas/${a.numQuestoes}')),
         child: ListView(padding: const EdgeInsets.all(24), children: [
           PageHeading(
               title: 'Gabarito de referência',
@@ -66,19 +95,21 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
               icon: Icons.document_scanner_outlined,
               title: 'Ler gabarito pela câmera',
               subtitle: 'Experimente a leitura simulada de uma folha.',
-              onTap: () async {
-                final result = await Navigator.push<List<int?>>(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            CapturaScreen(avaliacaoId: a.id, gabarito: true)));
-                if (mounted && result != null) {
-                  setState(() {
-                    _respostas = result;
-                    _alterado = true;
-                  });
-                }
-              }),
+              onTap: _salvando
+                  ? null
+                  : () async {
+                      final result = await Navigator.push<List<int?>>(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => CapturaScreen(
+                                  avaliacaoId: a.id, gabarito: true)));
+                      if (mounted && result != null) {
+                        setState(() {
+                          _respostas = result;
+                          _alterado = true;
+                        });
+                      }
+                    }),
           const SizedBox(height: 10),
           const InfoBanner(
               'O gabarito pertence à versão A. Folhas e leitura usam a mesma ordem nesta demonstração. Questões têm peso igual; a nota vai de 0 a 10.'),
@@ -103,11 +134,22 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
                           for (var alt = 0; alt < a.numAlternativas; alt++)
                             AnswerBubble(
                                 index: alt,
-                                selected: _respostas![q] == alt,
-                                onTap: () => setState(() {
-                                      _respostas![q] = alt;
-                                      _alterado = true;
-                                    }))
+                                selected: _respostas != null &&
+                                    _respostas!.length > q &&
+                                    _respostas![q] == alt,
+                                onTap: _salvando
+                                    ? null
+                                    : () => setState(() {
+                                          if (_respostas == null ||
+                                              _respostas!.length <
+                                                  a.numQuestoes) {
+                                            _respostas = [
+                                              ...store.gabarito(a.id)
+                                            ];
+                                          }
+                                          _respostas![q] = alt;
+                                          _alterado = true;
+                                        }))
                         ]))
                       ])),
                   if (q != a.numQuestoes - 1) const Divider(),

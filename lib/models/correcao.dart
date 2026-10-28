@@ -46,7 +46,7 @@ class Aluno {
       };
 
   factory Aluno.fromMap(Map<String, dynamic> map) => Aluno(
-        map['id'] as String,
+        (map['id'] ?? '').toString(),
         (map['nome'] as String?) ?? '',
       );
 }
@@ -71,7 +71,7 @@ class Questao {
 
   factory Questao.fromMap(Map<String, dynamic> map) {
     return Questao(
-      id: map['id'] as String,
+      id: (map['id'] ?? '').toString(),
       enunciado: (map['enunciado'] as String?) ?? '',
       disciplina: (map['disciplina'] as String?) ?? '',
       alternativas: (map['alternativas'] as List<dynamic>?)

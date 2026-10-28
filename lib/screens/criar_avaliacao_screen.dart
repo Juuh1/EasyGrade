@@ -26,22 +26,26 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
   int _alternativas = 5;
   bool _loaded = false;
   bool _temCorrecoes = false;
+  bool _salvando = false;
   bool get _edicao => widget.avaliacaoId != null;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_loaded) {
       _loaded = true;
       if (_edicao) {
-        final a = SessionScope.of(context).avaliacao(widget.avaliacaoId!);
-        _temCorrecoes = SessionScope.of(context).correcoes(a.id).isNotEmpty;
-        _nome.text = a.nome;
-        _disciplina.text = a.disciplina;
-        _turma = a.turma;
-        _data = a.data;
-        _alternativas = a.numAlternativas;
-        _quantidade.text = '${a.numQuestoes}';
-        if (a.data != null) _hora = TimeOfDay.fromDateTime(a.data!);
+        final a = SessionScope.of(context).avaliacaoOuNull(widget.avaliacaoId!);
+        if (a != null) {
+          _temCorrecoes = SessionScope.of(context).correcoes(a.id).isNotEmpty;
+          _nome.text = a.nome;
+          _disciplina.text = a.disciplina;
+          _turma = a.turma;
+          _data = a.data;
+          _alternativas = a.numAlternativas;
+          _quantidade.text = '${a.numQuestoes}';
+          if (a.data != null) _hora = TimeOfDay.fromDateTime(a.data!);
+        }
       }
     }
   }
@@ -68,11 +72,13 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
     setState(() => _data = date);
   }
 
-  void _salvar() {
-    if (!_form.currentState!.validate()) return;
+  Future<void> _salvar() async {
+    if (!_form.currentState!.validate() || _salvando) return;
+    setState(() => _salvando = true);
     final store = SessionScope.of(context);
     final stamp = DateTime.now().microsecondsSinceEpoch.toString();
-    final old = _edicao ? store.avaliacao(widget.avaliacaoId!) : null;
+    final old =
+        _edicao ? store.avaliacaoOuNull(widget.avaliacaoId!) : null;
     final a = Avaliacao(
         id: old?.id ?? stamp,
         codigo: old?.codigo ?? 'EG-${stamp.substring(stamp.length - 6)}',
@@ -86,15 +92,27 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
         numQuestoes: int.parse(_quantidade.text),
         numAlternativas: _alternativas,
         status: old?.status ?? StatusAvaliacao.rascunho);
-    store.salvar(a);
-    if (_edicao) {
-      Navigator.pop(context);
-      avisar(context, 'Avaliação atualizada nesta sessão.');
-    } else {
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (_) => SucessoAvaliacaoScreen(avaliacaoId: a.id)));
+
+    try {
+      await store.salvar(a);
+      if (!mounted) return;
+      if (_edicao) {
+        Navigator.pop(context);
+        avisar(context, 'Avaliação atualizada.');
+      } else {
+        Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (_) => SucessoAvaliacaoScreen(avaliacaoId: a.id)));
+      }
+    } catch (erro) {
+      if (mounted) {
+        avisar(context, 'Não foi possível salvar a avaliação: $erro');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _salvando = false);
+      }
     }
   }
 
@@ -119,6 +137,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                         const FormLabel('Nome da avaliação'),
                         TextFormField(
                             controller: _nome,
+                            enabled: !_salvando,
                             textInputAction: TextInputAction.next,
                             decoration: const InputDecoration(
                                 hintText: 'Ex.: Fundamentos de software'),
@@ -126,6 +145,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                         const FormLabel('Disciplina'),
                         TextFormField(
                             controller: _disciplina,
+                            enabled: !_salvando,
                             decoration: const InputDecoration(
                                 hintText: 'Ex.: Engenharia de Software'),
                             validator: obrigatorio),
@@ -143,7 +163,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                                 .map((t) =>
                                     DropdownMenuItem(value: t, child: Text(t)))
                                 .toList(),
-                            onChanged: _temCorrecoes
+                            onChanged: _temCorrecoes || _salvando
                                 ? null
                                 : (v) => setState(() => _turma = v),
                             validator: (v) =>
@@ -158,7 +178,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                         const FormLabel('Quantidade de questões'),
                         TextFormField(
                             controller: _quantidade,
-                            enabled: !_edicao,
+                            enabled: !_edicao && !_salvando,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(
                                 hintText: 'De 1 a 60', suffixText: 'questões'),
@@ -175,7 +195,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                                 label: Text('$n'),
                                 selected: _alternativas == n,
                                 showCheckmark: false,
-                                onSelected: _edicao
+                                onSelected: _edicao || _salvando
                                     ? null
                                     : (_) => setState(() => _alternativas = n))
                         ]),
@@ -195,7 +215,7 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                         const Eyebrow('Planejamento · opcional'),
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
-                            onPressed: _selecionarData,
+                            onPressed: _salvando ? null : _selecionarData,
                             icon: const Icon(Icons.calendar_month_outlined,
                                 size: 20),
                             label: Text(_data == null
@@ -204,35 +224,45 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                         if (_data != null) ...[
                           const SizedBox(height: 12),
                           OutlinedButton.icon(
-                              onPressed: () async {
-                                final hora = await showTimePicker(
-                                    context: context,
-                                    initialTime: _hora,
-                                    builder: (c, child) => MediaQuery(
-                                        data: MediaQuery.of(c).copyWith(
-                                            alwaysUse24HourFormat: true),
-                                        child: child!));
-                                if (mounted && hora != null) {
-                                  setState(() => _hora = hora);
-                                }
-                              },
+                              onPressed: _salvando
+                                  ? null
+                                  : () async {
+                                      final hora = await showTimePicker(
+                                          context: context,
+                                          initialTime: _hora,
+                                          builder: (c, child) => MediaQuery(
+                                              data: MediaQuery.of(c).copyWith(
+                                                  alwaysUse24HourFormat: true),
+                                              child: child!));
+                                      if (mounted && hora != null) {
+                                        setState(() => _hora = hora);
+                                      }
+                                    },
                               icon:
                                   const Icon(Icons.schedule_rounded, size: 20),
                               label: Text(
                                   '${_hora.hour.toString().padLeft(2, '0')}:${_hora.minute.toString().padLeft(2, '0')}')),
                           TextButton(
-                              onPressed: () => setState(() => _data = null),
+                              onPressed: _salvando
+                                  ? null
+                                  : () => setState(() => _data = null),
                               child: const Text('Remover data'))
                         ]
                       ])),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                      onPressed: _salvar,
-                      child: Text(
-                          _edicao ? 'Salvar alterações' : 'Criar avaliação')),
+                      onPressed: _salvando ? null : _salvar,
+                      child: _salvando
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : Text(
+                              _edicao ? 'Salvar alterações' : 'Criar avaliação')),
                   const SizedBox(height: 12),
                   const InfoBanner(
-                      'As informações ficam disponíveis apenas durante esta sessão de demonstração.'),
+                      'As informações da avaliação são salvas com segurança no Firebase Firestore.'),
                 ])),
       ]));
 }
@@ -242,7 +272,12 @@ class SucessoAvaliacaoScreen extends StatelessWidget {
   const SucessoAvaliacaoScreen({super.key, required this.avaliacaoId});
   @override
   Widget build(BuildContext context) {
-    final a = SessionScope.of(context).avaliacao(avaliacaoId);
+    final a = SessionScope.of(context).avaliacaoOuNull(avaliacaoId);
+    if (a == null) {
+      return const AppPage(
+          title: 'Avaliação criada',
+          child: Center(child: CircularProgressIndicator()));
+    }
     return AppPage(
         title: 'Avaliação criada',
         child: ListView(padding: const EdgeInsets.all(24), children: [

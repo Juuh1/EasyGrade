@@ -17,7 +17,11 @@ class TurmasScreen extends StatelessWidget {
               title: 'Turmas',
               subtitle:
                   'Organize as turmas e a identificação nas folhas de respostas.'),
-          if (store.turmas.isEmpty)
+          if (store.carregandoTurmas && store.turmas.isEmpty)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()))
+          else if (store.turmas.isEmpty)
             const EmptyState(
                 title: 'Nenhuma turma cadastrada',
                 subtitle: 'Adicione uma turma para cadastrar alunos.',
@@ -38,8 +42,15 @@ class TurmasScreen extends StatelessWidget {
                   avisar(context, 'Esta turma já existe.');
                   return;
                 }
-                store.adicionarTurma(nome);
-                abrir(context, AlunosScreen(turma: nome));
+                try {
+                  await store.adicionarTurma(nome);
+                  if (!context.mounted) return;
+                  abrir(context, AlunosScreen(turma: nome));
+                } catch (erro) {
+                  if (context.mounted) {
+                    avisar(context, 'Não foi possível criar a turma: $erro');
+                  }
+                }
               },
               icon: const Icon(Icons.add_rounded),
               label: const Text('Adicionar turma')),
@@ -97,8 +108,14 @@ class AlunosScreen extends StatelessWidget {
                     'Excluir turma?',
                     'A turma e seus alunos serão removidos.',
                     action: 'Excluir')) {
-                  store.removerTurma(turma);
-                  if (context.mounted) Navigator.pop(context);
+                  try {
+                    await store.removerTurma(turma);
+                    if (context.mounted) Navigator.pop(context);
+                  } catch (erro) {
+                    if (context.mounted) {
+                      avisar(context, 'Não foi possível excluir a turma: $erro');
+                    }
+                  }
                 }
               })
         ],
@@ -110,7 +127,7 @@ class AlunosScreen extends StatelessWidget {
           ActionTile(
               icon: Icons.upload_file_outlined,
               title: 'Importar lista de alunos',
-              subtitle: 'Visualize a conferência de uma planilha de exemplo.',
+              subtitle: 'Cole ou digite matrículas e nomes para importar.',
               onTap: () => abrir(context, ImportarAlunosScreen(turma: turma))),
           ActionTile(
               icon: Icons.person_add_alt_rounded,
@@ -121,7 +138,7 @@ class AlunosScreen extends StatelessWidget {
           if (alunos.isEmpty)
             const EmptyState(
                 title: 'Nenhum aluno cadastrado',
-                subtitle: 'Adicione alunos ou use a importação de exemplo.',
+                subtitle: 'Adicione alunos ou use a importação de lista.',
                 icon: Icons.groups_outlined)
           else
             ...alunos.map((s) => Padding(
@@ -155,7 +172,14 @@ class AlunosScreen extends StatelessWidget {
                                 'Remover aluno da turma?',
                                 'Resultados já registrados permanecem na avaliação.',
                                 action: 'Remover')) {
-                              store.removerAluno(turma, s.id);
+                              try {
+                                await store.removerAluno(turma, s.id);
+                              } catch (erro) {
+                                if (context.mounted) {
+                                  avisar(context,
+                                      'Não foi possível remover o aluno: $erro');
+                                }
+                              }
                             }
                           },
                           icon: const Icon(Icons.person_remove_outlined,
@@ -175,6 +199,8 @@ class NovoAlunoScreen extends StatefulWidget {
 class _NovoAlunoScreenState extends State<NovoAlunoScreen> {
   final _form = GlobalKey<FormState>();
   final _nome = TextEditingController(), _id = TextEditingController();
+  bool _salvando = false;
+
   @override
   void dispose() {
     _nome.dispose();
@@ -194,27 +220,44 @@ class _NovoAlunoScreenState extends State<NovoAlunoScreen> {
             child: Column(children: [
               TextFormField(
                   controller: _nome,
+                  enabled: !_salvando,
                   decoration: const InputDecoration(labelText: 'Nome completo'),
                   validator: obrigatorio),
               const SizedBox(height: 16),
               TextFormField(
                   controller: _id,
+                  enabled: !_salvando,
                   decoration: const InputDecoration(labelText: 'Matrícula'),
                   validator: obrigatorio)
             ])),
         const SizedBox(height: 24),
         ElevatedButton(
-            onPressed: () {
-              if (!_form.currentState!.validate()) return;
-              try {
-                SessionScope.of(context).adicionarAluno(
-                    widget.turma, Aluno(_id.text.trim(), _nome.text.trim()));
-                Navigator.pop(context);
-              } on ArgumentError {
-                avisar(context, 'Esta matrícula já está na turma.');
-              }
-            },
-            child: const Text('Adicionar à turma'))
+            onPressed: _salvando
+                ? null
+                : () async {
+                    if (!_form.currentState!.validate()) return;
+                    setState(() => _salvando = true);
+                    try {
+                      await SessionScope.of(context).adicionarAluno(
+                          widget.turma, Aluno(_id.text.trim(), _nome.text.trim()));
+                      if (!mounted) return;
+                      Navigator.pop(context);
+                      avisar(context, 'Aluno cadastrado com sucesso.');
+                    } on ArgumentError catch (e) {
+                      avisar(context, e.message.toString());
+                    } catch (erro) {
+                      avisar(context, 'Não foi possível cadastrar o aluno: $erro');
+                    } finally {
+                      if (mounted) setState(() => _salvando = false);
+                    }
+                  },
+            child: _salvando
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Text('Adicionar à turma'))
       ]));
 }
 
@@ -226,79 +269,132 @@ class ImportarAlunosScreen extends StatefulWidget {
 }
 
 class _ImportarAlunosScreenState extends State<ImportarAlunosScreen> {
-  static const _planilhaExemplo = [
-    Aluno('2026001', 'Ana Clara Souza'),
-    Aluno('2026002', 'Bruno Henrique Lima'),
-    Aluno('2026003', 'Carlos Eduardo Dias'),
-    Aluno('2026004', 'Daniela Martins Rocha'),
-    Aluno('2026005', 'Eduardo Santos Silva'),
-    Aluno('2026006', 'Fernanda Oliveira Castro'),
-    Aluno('2026007', 'Gabriel Alves Pereira'),
-    Aluno('2026008', 'Helena Ribeiro Costa'),
-  ];
+  final _controller = TextEditingController();
+  bool _salvando = false;
+  List<Aluno> _alunosParseados = [];
+  String? _erroParse;
 
-  bool _abriu = false;
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _processarTexto(String texto) {
+    final linhas = texto.split('\n');
+    final lista = <Aluno>[];
+    String? erro;
+    for (var i = 0; i < linhas.length; i++) {
+      final linha = linhas[i].trim();
+      if (linha.isEmpty) continue;
+      final partes = linha.contains(',')
+          ? linha.split(',')
+          : (linha.contains(';') ? linha.split(';') : linha.split('\t'));
+      if (partes.length < 2) {
+        erro = 'Linha ${i + 1} inválida. Use o formato: matrícula, nome';
+        break;
+      }
+      final id = partes[0].trim();
+      final nome = partes.sublist(1).join(',').trim();
+      if (id.isEmpty || nome.isEmpty) {
+        erro = 'Linha ${i + 1} possui campos vazios.';
+        break;
+      }
+      if (lista.any((a) => a.id == id)) {
+        erro = 'Matrícula repetida na importação: $id';
+        break;
+      }
+      lista.add(Aluno(id, nome));
+    }
+    setState(() {
+      _erroParse = erro;
+      _alunosParseados = erro == null ? lista : [];
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final store = SessionScope.of(context), lista = store.alunos(widget.turma);
-    final novos = _planilhaExemplo
-        .where((a) => !lista.any((s) => s.id == a.id))
+    final store = SessionScope.of(context), listaTurma = store.alunos(widget.turma);
+    final novos = _alunosParseados
+        .where((a) => !listaTurma.any((s) => s.id == a.id))
         .toList();
+
     return AppPage(
         title: 'Importar alunos',
         child: ListView(padding: const EdgeInsets.all(24), children: [
           const PageHeading(
               title: 'Importar alunos',
               subtitle:
-                  'O fluxo previsto recebe uma planilha com nome e matrícula e permite conferir os dados.'),
+                  'Insira ou cole uma lista com matrícula e nome para cadastrar os alunos.'),
           const InfoBanner(
-              'A importação lê nome e matrícula para cadastrar os alunos no Firestore.'),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-              onPressed: () => setState(() => _abriu = true),
-              icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Abrir planilha de exemplo')),
-          if (_abriu) ...[
-            const SectionHeading('Confira antes de importar'),
+              'Formato esperado por linha: Matrícula, Nome completo\nExemplo: 2026100, Maria Souza'),
+          const SizedBox(height: 16),
+          TextFormField(
+              controller: _controller,
+              enabled: !_salvando,
+              minLines: 4,
+              maxLines: 8,
+              onChanged: _processarTexto,
+              decoration: InputDecoration(
+                  labelText: 'Lista de alunos',
+                  hintText: '2026001, Ana Paula\n2026002, Carlos Silva',
+                  errorText: _erroParse)),
+          if (_alunosParseados.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            SectionHeading('Alunos identificados (${_alunosParseados.length})'),
             SurfaceCard(
-                child: Column(children: [
-              const Row(children: [
-                Icon(Icons.table_chart_outlined, color: AppColors.primary),
-                SizedBox(width: 10),
-                Expanded(
-                    child: Text('alunos_exemplo.xlsx',
-                        style: TextStyle(fontWeight: FontWeight.w700)))
-              ]),
-              const SizedBox(height: 16),
-              ..._planilhaExemplo.map((s) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                    children: _alunosParseados.map((s) {
+              final jaExiste = listaTurma.any((a) => a.id == s.id);
+              return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(children: [
                     Expanded(
-                        child:
-                            Text(s.nome, style: const TextStyle(fontSize: 12))),
-                    Text(lista.any((a) => a.id == s.id) ? 'Já na turma' : s.id,
-                        style: const TextStyle(
-                            fontSize: 10, color: AppColors.textSecondary))
-                  ])))
-            ])),
+                        child: Text(s.nome,
+                            style: const TextStyle(fontSize: 12))),
+                    Text(jaExiste ? 'Já na turma' : s.id,
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: jaExiste ? FontWeight.w700 : FontWeight.w400,
+                            color: jaExiste
+                                ? AppColors.agendadaFg
+                                : AppColors.textSecondary))
+                  ]));
+            }).toList())),
             const SizedBox(height: 16),
             InfoBanner(
-                '${novos.length} novos alunos · ${_planilhaExemplo.length - novos.length} matrículas já cadastradas serão ignoradas.'),
+                '${novos.length} novos alunos serão adicionados à ${widget.turma}.'),
             const SizedBox(height: 24),
             ElevatedButton(
-                onPressed: novos.isEmpty
+                onPressed: _salvando || novos.isEmpty
                     ? null
-                    : () {
-                        for (final s in novos) {
-                          store.adicionarAluno(widget.turma, s);
+                    : () async {
+                        setState(() => _salvando = true);
+                        try {
+                          for (final a in novos) {
+                            await store.adicionarAluno(widget.turma, a);
+                          }
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          avisar(context,
+                              '${novos.length} alunos importados com sucesso.');
+                        } catch (erro) {
+                          if (mounted) {
+                            avisar(context, 'Erro durante a importação: $erro');
+                          }
+                        } finally {
+                          if (mounted) setState(() => _salvando = false);
                         }
-                        Navigator.pop(context);
-                        avisar(context,
-                            '${novos.length} alunos importados com sucesso.');
                       },
-                child: Text(novos.isEmpty
-                    ? 'Todos já estão na turma'
-                    : 'Importar ${novos.length} alunos'))
+                child: _salvando
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Text(novos.isEmpty
+                        ? 'Todos já estão na turma'
+                        : 'Importar ${novos.length} alunos'))
           ]
         ]));
   }
@@ -314,20 +410,34 @@ class QuestoesScreen extends StatefulWidget {
 class _QuestoesScreenState extends State<QuestoesScreen> {
   List<String>? _selecionadas;
   String _busca = '';
+  bool _salvando = false;
+  bool _alterado = false;
+
   @override
   Widget build(BuildContext context) {
     final store = SessionScope.of(context);
     final a = widget.avaliacaoId == null
         ? null
-        : store.avaliacao(widget.avaliacaoId!);
+        : store.avaliacaoOuNull(widget.avaliacaoId!);
     final bloqueado = a != null && store.correcoes(a.id).isNotEmpty;
-    _selecionadas ??=
-        a == null ? [] : store.questoes(a.id).map((q) => q.id).toList();
+    if (!_alterado) {
+      if (a != null) {
+        final questoesAtuais = store.questoes(a.id);
+        if (questoesAtuais.isNotEmpty) {
+          _selecionadas = questoesAtuais.map((q) => q.id).toList();
+        } else {
+          _selecionadas = [...store.variantesQuestoesIds(a.id)];
+        }
+      } else {
+        _selecionadas = [];
+      }
+    }
     final questoes = store.bancoQuestoes
         .where((q) => '${q.enunciado} ${q.disciplina}'
             .toLowerCase()
             .contains(_busca.toLowerCase()))
         .toList();
+
     return AppPage(
         title: a == null ? 'Banco de questões' : 'Questões da avaliação',
         actions: [
@@ -339,26 +449,47 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
         bottom: a == null || bloqueado
             ? null
             : ElevatedButton(
-                onPressed: () async {
-                  if (store.gabaritoPronto(a.id) &&
-                      !await confirmar(
-                          context,
-                          'Atualizar questões e referência?',
-                          'As respostas das questões selecionadas serão usadas no gabarito. As posições restantes ficarão sem resposta.',
-                          action: 'Atualizar')) {
-                    return;
-                  }
-                  if (!context.mounted) return;
-                  store.salvarQuestoes(
-                      a.id,
-                      _selecionadas!
-                          .map((id) =>
-                              store.bancoQuestoes.firstWhere((q) => q.id == id))
-                          .toList());
-                  Navigator.pop(context);
-                },
-                child: Text(
-                    'Usar ${_selecionadas!.length}/${a.numQuestoes} questões')),
+                onPressed: _salvando
+                    ? null
+                    : () async {
+                        if (store.gabaritoPronto(a.id) &&
+                            !await confirmar(
+                                context,
+                                'Atualizar questões e referência?',
+                                'As respostas das questões selecionadas serão usadas no gabarito. As posições restantes ficarão sem resposta.',
+                                action: 'Atualizar')) {
+                          return;
+                        }
+                        if (!context.mounted) return;
+                        setState(() => _salvando = true);
+                        try {
+                          final questoesParaSalvar = _selecionadas!
+                              .map((id) => store.bancoQuestoes
+                                  .where((q) => q.id == id)
+                                  .firstOrNull)
+                              .whereType<Questao>()
+                              .toList();
+                          await store.salvarQuestoes(a.id, questoesParaSalvar);
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          avisar(context, 'Questões da avaliação salvas.');
+                        } catch (erro) {
+                          if (context.mounted) {
+                            avisar(context,
+                                'Não foi possível salvar as questões da avaliação: $erro');
+                          }
+                        } finally {
+                          if (mounted) setState(() => _salvando = false);
+                        }
+                      },
+                child: _salvando
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Text(
+                        'Usar ${_selecionadas!.length}/${a.numQuestoes} questões')),
         child: ListView(padding: const EdgeInsets.all(24), children: [
           PageHeading(
               title: a == null ? 'Banco de questões' : 'Selecionar questões',
@@ -381,7 +512,11 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                   hintText: 'Buscar enunciado ou disciplina',
                   prefixIcon: Icon(Icons.search_rounded))),
           const SizedBox(height: 20),
-          if (questoes.isEmpty)
+          if (store.carregandoQuestoes && store.bancoQuestoes.isEmpty)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()))
+          else if (questoes.isEmpty)
             const EmptyState(
                 title: 'Nenhuma questão encontrada',
                 subtitle: 'Adicione uma pergunta ou ajuste a busca.')
@@ -401,7 +536,7 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                           if (a != null)
                             Checkbox(
                                 value: selected,
-                                onChanged: bloqueado || !compatible
+                                onChanged: bloqueado || !compatible || _salvando
                                     ? null
                                     : (v) {
                                         if (v! &&
@@ -411,9 +546,12 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                                               'A avaliação já tem ${a.numQuestoes} questões selecionadas.');
                                           return;
                                         }
-                                        setState(() => v
-                                            ? _selecionadas!.add(q.id)
-                                            : _selecionadas!.remove(q.id));
+                                        setState(() {
+                                          _alterado = true;
+                                          v
+                                              ? _selecionadas!.add(q.id)
+                                              : _selecionadas!.remove(q.id);
+                                        });
                                       })
                           else
                             IconButton(
@@ -426,7 +564,17 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                                       'Excluir questão?',
                                       'A questão será removida do banco de questões.',
                                       action: 'Excluir')) {
-                                    store.excluirQuestao(q.id);
+                                    try {
+                                      await store.excluirQuestao(q.id);
+                                      if (context.mounted) {
+                                        avisar(context, 'Questão excluída.');
+                                      }
+                                    } catch (erro) {
+                                      if (context.mounted) {
+                                        avisar(context,
+                                            'Não foi possível excluir a questão: $erro');
+                                      }
+                                    }
                                   }
                                 })
                         ]),
@@ -479,6 +627,8 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
   final _alternativas = List.generate(5, (_) => TextEditingController());
   int _quantidade = 5;
   int? _correta;
+  bool _salvando = false;
+
   @override
   void dispose() {
     _enunciado.dispose();
@@ -504,12 +654,14 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                 children: [
                   TextFormField(
                       controller: _disciplina,
+                      enabled: !_salvando,
                       decoration:
                           const InputDecoration(labelText: 'Disciplina'),
                       validator: obrigatorio),
                   const SizedBox(height: 16),
                   TextFormField(
                       controller: _enunciado,
+                      enabled: !_salvando,
                       minLines: 3,
                       maxLines: 6,
                       decoration: const InputDecoration(labelText: 'Enunciado'),
@@ -520,12 +672,14 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                       ChoiceChip(
                           label: Text('$n'),
                           selected: _quantidade == n,
-                          onSelected: (_) => setState(() {
-                                _quantidade = n;
-                                if (_correta != null && _correta! >= n) {
-                                  _correta = null;
-                                }
-                              }))
+                          onSelected: _salvando
+                              ? null
+                              : (_) => setState(() {
+                                    _quantidade = n;
+                                    if (_correta != null && _correta! >= n) {
+                                      _correta = null;
+                                    }
+                                  }))
                   ]),
                   const SizedBox(height: 16),
                   for (var i = 0; i < _quantidade; i++)
@@ -535,11 +689,14 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                           AnswerBubble(
                               index: i,
                               selected: _correta == i,
-                              onTap: () => setState(() => _correta = i)),
+                              onTap: _salvando
+                                  ? null
+                                  : () => setState(() => _correta = i)),
                           const SizedBox(width: 8),
                           Expanded(
                               child: TextFormField(
                                   controller: _alternativas[i],
+                                  enabled: !_salvando,
                                   decoration: InputDecoration(
                                       labelText:
                                           'Alternativa ${String.fromCharCode(65 + i)}'),
@@ -549,26 +706,47 @@ class _NovaQuestaoScreenState extends State<NovaQuestaoScreen> {
                       'Toque na letra para definir a resposta correta.'),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                      onPressed: () {
-                        if (!_form.currentState!.validate()) return;
-                        if (_correta == null) {
-                          avisar(context, 'Selecione a alternativa correta.');
-                          return;
-                        }
-                        SessionScope.of(context).adicionarQuestao(Questao(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            enunciado: _enunciado.text.trim(),
-                            disciplina: _disciplina.text.trim(),
-                            alternativas: _alternativas
-                                .take(_quantidade)
-                                .map((c) => c.text.trim())
-                                .toList(),
-                            correta: _correta!));
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Salvar questão'))
+                      onPressed: _salvando
+                          ? null
+                          : () async {
+                              if (!_form.currentState!.validate()) return;
+                              if (_correta == null) {
+                                avisar(context, 'Selecione a alternativa correta.');
+                                return;
+                              }
+                              setState(() => _salvando = true);
+                              try {
+                                await SessionScope.of(context)
+                                    .adicionarQuestao(Questao(
+                                        id: DateTime.now()
+                                            .microsecondsSinceEpoch
+                                            .toString(),
+                                        enunciado: _enunciado.text.trim(),
+                                        disciplina: _disciplina.text.trim(),
+                                        alternativas: _alternativas
+                                            .take(_quantidade)
+                                            .map((c) => c.text.trim())
+                                            .toList(),
+                                        correta: _correta!));
+                                if (!mounted) return;
+                                Navigator.pop(context);
+                                avisar(context, 'Questão salva com sucesso.');
+                              } catch (erro) {
+                                if (mounted) {
+                                  avisar(context,
+                                      'Não foi possível salvar a questão: $erro');
+                                }
+                              } finally {
+                                if (mounted) setState(() => _salvando = false);
+                              }
+                            },
+                      child: _salvando
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('Salvar questão'))
                 ]))
       ]));
 }

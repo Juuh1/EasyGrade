@@ -162,4 +162,40 @@ void main() {
     store.excluirQuestao('q1');
     expect(store.bancoQuestoes, isEmpty);
   });
+
+  test('salvarQuestoes sincroniza questoes e gera o gabarito correspondente', () async {
+    final store = SessionStore();
+    addTearDown(store.dispose);
+    await store.salvar(const Avaliacao(
+        id: 'av1',
+        codigo: 'EG-AV1',
+        nome: 'Avaliação 1',
+        disciplina: 'Física',
+        turma: '1º Ano A',
+        data: null,
+        numQuestoes: 2,
+        numAlternativas: 4,
+        status: StatusAvaliacao.rascunho));
+
+    const q1 = Questao(
+      id: 'q1',
+      enunciado: 'Q1',
+      disciplina: 'Física',
+      alternativas: ['A', 'B', 'C', 'D'],
+      correta: 1,
+    );
+    const q2 = Questao(
+      id: 'q2',
+      enunciado: 'Q2',
+      disciplina: 'Física',
+      alternativas: ['A', 'B', 'C', 'D'],
+      correta: 3,
+    );
+
+    await store.salvarQuestoes('av1', [q1, q2]);
+    expect(store.questoes('av1').length, 2);
+    expect(store.variantesQuestoesIds('av1'), ['q1', 'q2']);
+    expect(store.gabarito('av1'), [1, 3]);
+    expect(store.gabaritoPronto('av1'), isTrue);
+  });
 }
