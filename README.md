@@ -1,56 +1,122 @@
 # EasyGrade
 
-Aplicativo Android para professores prepararem e corrigirem avaliações objetivas em papel, com identificação por QR Code, revisão das marcações e resultados por aluno e turma.
+Aplicativo Android para professores organizarem avaliações objetivas em papel e agilizar a correção. O professor prepara a avaliação e as folhas de respostas, fotografa cada folha e revisa as marcações reconhecidas antes de confirmar os resultados.
 
-## Escopo
+## Equipe
 
-- Acesso por e-mail e senha ou conta Google, cadastro e recuperação de senha.
-- Avaliações, turmas, alunos, banco de questões, gabaritos e correções vinculados à conta do professor no Cloud Firestore.
-- Importação de alunos por Excel (.xlsx), CSV ou texto com matrícula e nome.
-- Folhas identificadas e cadernos em PDF, impressão e compartilhamento; cadernos editáveis em Word (.docx).
-- Versões por aluno com questões e alternativas embaralhadas.
-- Captura pela câmera ou galeria, leitura das marcações e revisão antes da confirmação da nota.
-- Notas, estatísticas por questão e exportação Excel com as alternativas assinaladas.
+| Integrante |
+| --- |
+| Jorge Luiz Horn Júnior |
+| Juliana Maria de Azevedo |
+| Lorenzo Foralasso Kochemberger |
+| Eduardo Coelho |
+
+## Escopo atual
+
+Na N2, os dados de avaliações, turmas, alunos e questões passaram a ser lidos e gravados no Cloud Firestore, associados à conta autenticada do professor. O aplicativo também prepara os materiais impressos e processa as folhas de resposta no aparelho. A leitura automática auxilia a correção; o professor confere as marcações antes de salvar a nota.
+
+O fluxo principal é: entrar na conta, cadastrar turma e alunos, montar avaliação e gabarito, gerar e imprimir cadernos e folhas, fotografar as respostas, revisar a leitura e consultar ou exportar os resultados.
 
 ## Requisitos
 
-| Código | Requisito funcional |
+### Funcionais
+
+| Código | Requisito |
 | --- | --- |
-| RF01 | Autenticar o professor e manter seus dados privados. |
-| RF02 | Cadastrar, consultar, editar e excluir avaliações. |
-| RF03 | Organizar turmas, alunos e questões e importar listas de alunos. |
-| RF04 | Definir gabaritos e gerar materiais identificados e versões da prova. |
-| RF05 | Ler e revisar folhas de respostas e persistir as correções. |
-| RF06 | Consultar notas e estatísticas e exportar as respostas em Excel. |
-| RF07 | Atualizar perfil, senha e preferências. |
+| RF01 | Criar conta, entrar por e-mail e senha ou Google, recuperar a senha e manter a sessão do professor. |
+| RF02 | Criar, consultar, editar e excluir avaliações e seus gabaritos. |
+| RF03 | Organizar turmas e alunos e importar listas por XLSX, CSV ou texto. |
+| RF04 | Manter banco de questões e preparar cadernos e folhas identificadas; permitir versões com questões e alternativas embaralhadas. |
+| RF05 | Capturar ou selecionar a foto de uma folha gerada pelo EasyGrade, reconhecer sua identificação e marcações, revisar e confirmar a correção. |
+| RF06 | Consultar notas e estatísticas por aluno, turma e questão e exportar respostas para Excel. |
+| RF07 | Consultar e atualizar perfil, senha e preferências da conta. |
 
-Requisitos não funcionais: interface em português, navegação adaptada ao celular, respeito à redução de movimento, dados separados por usuário autenticado e processamento das fotos no aparelho. As fotos não são enviadas ao Firestore. A gravação e recuperação dos dados exigem conexão à internet.
+### Não funcionais
 
-## Telas principais
+| Código | Requisito |
+| --- | --- |
+| RNF01 | Manter os dados de cada professor separados pelo identificador da conta autenticada nas regras e no acesso ao Firestore. |
+| RNF02 | Processar as imagens da folha no dispositivo; as fotos não são enviadas ao Firestore. |
+| RNF03 | Apresentar interface em português, adaptada ao uso móvel, e respeitar a preferência por redução de movimento. |
+| RNF04 | Exigir conexão à internet para autenticação e leitura/gravação dos dados na nuvem. |
+| RNF05 | A leitura da folha depende de impressão e fotografia adequadas e deve ser revisada pelo professor antes da confirmação. |
 
-Acesso e cadastro; início; avaliações e filtros; criação e edição da avaliação; gabarito; turmas e alunos; importação; banco de questões; materiais e organização das páginas; captura e revisão; resultados e estatísticas; relatório; perfil e configurações.
+## Telas e fluxo
 
-## Uso
+O aplicativo reúne autenticação e cadastro; início e perfil; avaliações e filtros; criação, edição e gabarito; turmas, alunos e importação; banco de questões; preparação e geração dos materiais; leitura pela câmera ou galeria; revisão das respostas; resultados, estatísticas e relatório.
 
-1. Entre ou crie uma conta. Cadastre a turma e seus alunos.
-2. Crie a avaliação e defina seu gabarito. Para gerar o caderno, selecione todas as questões.
-3. Em Materiais, gere as versões por aluno se desejar embaralhar a prova. Depois gere os cadernos e as folhas.
-4. Imprima as folhas em A4, no tamanho original. Use apenas as folhas geradas pelo EasyGrade para a leitura automática.
-5. Fotografe a folha inteira, plana, com boa iluminação e as quatro marcas dos cantos visíveis. Preencha as bolhas com caneta preta ou azul.
-6. Confira as respostas reconhecidas, resolva as marcações incertas e confirme. Consulte os resultados ou exporte o Excel.
+As folhas devem ser geradas pelo EasyGrade e impressas em A4 no tamanho original, com as quatro marcas dos cantos visíveis na foto. O preenchimento deve ser feito com caneta preta ou azul. O navegador permite selecionar imagens; a captura direta pela câmera é destinada ao Android. Matrículas com zeros à esquerda devem ser mantidas como texto na planilha.
 
-O reconhecimento depende da qualidade da foto e do preenchimento. A revisão pelo professor é obrigatória. O navegador permite selecionar uma foto; a captura com a câmera é destinada ao Android. Matrículas com zeros à esquerda devem estar como texto na planilha de importação.
+## Tecnologias
 
-## Execução e entrega
+- **Flutter e Dart:** interface e aplicativo Android.
+- **Firebase Authentication:** contas de professores e login Google.
+- **Cloud Firestore:** persistência das avaliações, turmas, alunos, questões, gabaritos e correções.
+- **Google ML Kit, ZXing e QR Flutter:** identificação das folhas por QR Code.
+- **Image Picker e Image:** captura/seleção e processamento local das imagens.
+- **PDF e Printing:** geração, impressão e compartilhamento dos materiais.
+- **Excel e CSV:** importação de alunos e exportação de resultados.
 
-Requer Flutter 3.41 ou superior com Dart 3.11 ou superior, Android SDK e Java 17 ou superior.
+## Organização do código
+
+```text
+lib/
+  data/       autenticação, acesso ao Firestore e estado da sessão
+  models/     modelos de avaliação, correção, filtros e status
+  screens/    telas e fluxos do aplicativo
+  services/   leitura de folhas, arquivos e importação
+  theme/      cores, tipografia e tema visual
+  widgets/    componentes reutilizados pelas telas
+android/      configuração da plataforma Android
+assets/       fonte Manrope
+SVG/          marcas e elementos vetoriais do aplicativo
+web/          recursos de execução no navegador
+```
+
+Os documentos ficam sob `usuarios/{uid}` no Firestore. O repositório de dados valida os caminhos aceitos e associa as operações ao usuário autenticado. As regras de acesso estão em `firestore.rules`; índices declarados ficam em `firestore.indexes.json`.
+
+## Executar o aplicativo
+
+Requisitos locais: Flutter 3.41 ou superior, Dart 3.11 ou superior, Android SDK e Java 17 ou superior.
 
 ```sh
 flutter pub get
 flutter run
+```
+
+A configuração pública do Firebase está em `lib/firebase_options.dart` e o projeto Firebase usado é `easygrade-dc9be`. Para autenticação Google em outra instalação Android, cadastre no Firebase o SHA do certificado de assinatura correspondente.
+
+O APK entregue está em [`EasyGrade.apk`](EasyGrade.apk). Para gerar outro APK de release a partir do código:
+
+```sh
 flutter build apk --release
 ```
 
-O projeto utiliza o Firebase `easygrade-dc9be`. A configuração pública do aplicativo está em `lib/firebase_options.dart`; não utiliza chave privada de administrador. Para login Google em outra assinatura Android, cadastre o SHA do certificado no Firebase.
+## Backlog realizado na N2
 
-O APK de entrega está em [entrega/EasyGrade.apk](entrega/EasyGrade.apk). O build acadêmico usa a assinatura local de desenvolvimento. Documentos de apoio, testes e arquivos temporários ficam locais, fora do versionamento.
+As tarefas abaixo correspondem às entregas integradas ao projeto nesta fase.
+
+### Juliana Maria de Azevedo
+
+| Tarefa | Prazo previsto | Situação |
+| --- | --- | --- |
+| Configurar o projeto Firebase, Firestore, coleções e regras de segurança | 07/10/2026 | Concluída |
+| Criar a camada reutilizável de acesso ao Firestore | 09/10/2026 | Concluída |
+
+### Lorenzo Foralasso Kochemberger
+
+| Tarefa | Prazo previsto | Situação |
+| --- | --- | --- |
+| Substituir os mocks e integrar o módulo 1 ao Firestore | 13/10/2026 | Concluída |
+
+### Eduardo Coelho
+
+| Tarefa | Prazo previsto | Situação |
+| --- | --- | --- |
+| Substituir os mocks e integrar os módulos 2 e 3 ao Firestore | 13/10/2026 | Concluída |
+
+### Jorge Luiz Horn Júnior
+
+| Tarefa | Prazo previsto | Situação |
+| --- | --- | --- |
+| Revisar e ajustar classes de domínio e Issues para a integração com dados reais | 12/10/2026 | Concluída |
