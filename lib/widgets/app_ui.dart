@@ -22,6 +22,9 @@ String mensagemErro(Object erro) {
   return 'Confira a conexão e tente novamente.';
 }
 
+String? obrigatorio(String? valor) =>
+    valor == null || valor.trim().isEmpty ? 'Preencha este campo.' : null;
+
 class Brand extends StatelessWidget {
   final double size;
   final bool wordmark;

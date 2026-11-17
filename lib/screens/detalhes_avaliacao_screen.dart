@@ -140,7 +140,7 @@ class DetalhesAvaliacaoScreen extends StatelessWidget {
                     ]),
                     const SizedBox(height: 10),
                     Text(
-                        '$corrigidas de $alunos alunos com resultado nesta sessão.',
+                        '$corrigidas de $alunos alunos corrigidos.',
                         style: const TextStyle(fontSize: 12)),
                     const SizedBox(height: 16),
                     ClipRRect(

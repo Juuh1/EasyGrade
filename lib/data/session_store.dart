@@ -1,17 +1,15 @@
 import 'dart:async';
 import 'dart:math';
-import 'auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import '../models/avaliacao.dart';
 import '../models/correcao.dart';
 import '../models/status_avaliacao.dart';
 import 'firestore_repository.dart';
+import 'preferencias_locais.dart'
+    if (dart.library.js_interop) 'preferencias_web.dart';
 
-/// Estado da sessão conectado ao Cloud Firestore:
-/// - Módulo 1: Avaliações
-/// - Módulo 2: Turmas e Alunos
-/// - Módulo 3: Banco de Questões
 class SessionStore extends ChangeNotifier {
   final List<Avaliacao> _avaliacoes = [];
   final Map<String, List<int?>> _gabaritos = {};
@@ -26,13 +24,13 @@ class SessionStore extends ChangeNotifier {
   final Map<String, List<String>> _variantesQuestoesIds = {};
 
   String nome = 'Professor', email = '', instituicao = '';
-  AuthService? autenticacao;
+  int pontuacaoPadrao = 1000;
   final Map<String, Future<void>> _turmasPendentes = {};
   final Map<String, List<Map<String, dynamic>>> _variantes = {};
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
-      _correcoesSubs = {};
+  _correcoesSubs = {};
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
-      _materiaisSubs = {};
+  _materiaisSubs = {};
   final Set<String> carregandoDetalhes = {};
   final Map<String, Set<String>> _detalhesPendentes = {};
   int _geracao = 0;
@@ -42,21 +40,18 @@ class SessionStore extends ChangeNotifier {
     if (!_descartado) super.notifyListeners();
   }
 
-  bool reduzirMovimento = false;
-
   FirestoreRepository? _repo;
 
-  // Assinaturas do Firestore
   StreamSubscription<List<Map<String, dynamic>>>? _avaliacoesSub;
   StreamSubscription<List<Map<String, dynamic>>>? _turmasSub;
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
-      _alunosSubs = {};
+  _alunosSubs = {};
   StreamSubscription<List<Map<String, dynamic>>>? _disciplinasSub;
   StreamSubscription<List<Map<String, dynamic>>>? _questoesSub;
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
-      _variantesSubs = {};
+  _variantesSubs = {};
   final Map<String, StreamSubscription<List<Map<String, dynamic>>>>
-      _gabaritosSubs = {};
+  _gabaritosSubs = {};
 
   bool carregandoAvaliacoes = false;
   bool carregandoTurmas = false;
@@ -69,218 +64,247 @@ class SessionStore extends ChangeNotifier {
   SessionStore();
 
   /// Conecta a sessão ao Firestore do professor autenticado.
-  void conectar(FirestoreRepository repo, {AuthService? auth}) {
+  void conectar(FirestoreRepository repo) {
     desconectar(notificar: false);
     _repo = repo;
-    autenticacao = auth;
     final geracao = _geracao;
 
-    // Módulo 1: Avaliações
     carregandoAvaliacoes = true;
     erroAvaliacoes = null;
-    _avaliacoesSub = repo.acompanhar('avaliacoes').listen((docs) {
-      if (geracao != _geracao) return;
-      final ordenados = [...docs]
-        ..sort((a, b) => _criadoEm(b).compareTo(_criadoEm(a)));
-      final lista = <Avaliacao>[];
-      final idsAtuais = <String>{};
-      for (final doc in ordenados) {
-        try {
-          final a = Avaliacao.fromMap(doc);
-          lista.add(a);
-          idsAtuais.add(a.id);
-        } catch (_) {}
-      }
-      _avaliacoes
-        ..clear()
-        ..addAll(lista);
-      carregandoAvaliacoes = false;
-
-      // Limpa assinaturas de avaliações excluídas
-      final idsRemovidos =
-          _variantesSubs.keys.where((id) => !idsAtuais.contains(id)).toList();
-      for (final id in idsRemovidos) {
-        _variantesSubs.remove(id)?.cancel();
-        _gabaritosSubs.remove(id)?.cancel();
-        _correcoesSubs.remove(id)?.cancel();
-        _materiaisSubs.remove(id)?.cancel();
-        _correcoes.remove(id);
-        _variantes.remove(id);
-        _questoes.remove(id);
-        _variantesQuestoesIds.remove(id);
-        _gabaritos.remove(id);
-      }
-
-      // Conecta subcoleções de cada avaliação (variantes e gabaritos)
-      for (final a in lista) {
-        final aId = a.id;
-        if (!_variantesSubs.containsKey(aId)) {
-          carregandoDetalhes.add(aId);
-          _detalhesPendentes[aId] = {
-            'variantes',
-            'gabaritos',
-            'correcoes',
-            'materiais'
-          };
-          _variantesSubs[aId] =
-              repo.acompanhar('avaliacoes/$aId/variantes').listen((vDocs) {
+    _avaliacoesSub = repo
+        .acompanhar('avaliacoes')
+        .listen(
+          (docs) {
             if (geracao != _geracao) return;
-            _variantes[aId] = vDocs;
-            _detalheCarregado(aId, 'variantes');
-            final varDoc = vDocs.where((d) => d['id'] == 'A').firstOrNull;
-            if (varDoc != null && varDoc['questoes'] is List) {
-              final qIds = (varDoc['questoes'] as List)
-                  .map((e) => e.toString().trim())
-                  .where((e) => e.isNotEmpty)
-                  .toList();
-              final itens = varDoc['itens'];
-              if (itens is List) {
-                _questoes[aId] = itens
-                    .map((v) =>
-                        Questao.fromMap(Map<String, dynamic>.from(v as Map)))
-                    .toList();
-              }
-              _variantesQuestoesIds[aId] = qIds;
-              _reconstruirQuestoesAvaliacao(aId);
-            }
-            notifyListeners();
-          }, onError: (Object _) {
-            erroAvaliacoes =
-                'Não foi possível carregar os detalhes da avaliação.';
-            notifyListeners();
-          });
-        }
-
-        if (!_gabaritosSubs.containsKey(aId)) {
-          _gabaritosSubs[aId] =
-              repo.acompanhar('avaliacoes/$aId/gabaritos').listen((gDocs) {
-            if (geracao != _geracao) return;
-            _detalheCarregado(aId, 'gabaritos');
-            final gabDoc = gDocs.where((d) => d['id'] == 'A').firstOrNull ??
-                gDocs.firstOrNull;
-            if (gabDoc != null && gabDoc['respostas'] is List) {
-              final resps = (gabDoc['respostas'] as List)
-                  .map((e) => e == null ? null : (e as num).toInt())
-                  .toList();
-              _gabaritos[aId] = resps;
-              notifyListeners();
-            }
-          }, onError: (Object _) {});
-        }
-        if (!_correcoesSubs.containsKey(aId)) {
-          _correcoesSubs[aId] =
-              repo.acompanhar('avaliacoes/$aId/correcoes').listen((docs) {
-            if (geracao != _geracao) return;
-            final lista = <Correcao>[];
-            for (final doc in docs) {
+            final ordenados = [...docs]
+              ..sort((a, b) => _criadoEm(b).compareTo(_criadoEm(a)));
+            final lista = <Avaliacao>[];
+            final idsAtuais = <String>{};
+            for (final doc in ordenados) {
               try {
-                final r = Correcao.fromMap(doc);
-                if (r.respostas.length == a.numQuestoes) lista.add(r);
-              } catch (_) {
-                erroAvaliacoes = 'Uma correção contém dados inválidos.';
-              }
-            }
-            _correcoes[aId] = lista;
-            _detalheCarregado(aId, 'correcoes');
-            notifyListeners();
-          }, onError: (Object _) {
-            carregandoDetalhes.remove(aId);
-            erroAvaliacoes = 'Não foi possível carregar as correções.';
-            notifyListeners();
-          });
-          _materiaisSubs[aId] =
-              repo.acompanhar('avaliacoes/$aId/materiais').listen((docs) {
-            if (geracao != _geracao) return;
-            _detalheCarregado(aId, 'materiais');
-            final layout = docs.where((v) => v['id'] == 'layout').firstOrNull;
-            if (layout?['paginas'] is List) {
-              _paginas[aId] = (layout!['paginas'] as List)
-                  .map((v) => (v as num).toInt())
-                  .toList();
-            }
-            notifyListeners();
-          }, onError: (Object _) {
-            erroAvaliacoes =
-                'Não foi possível carregar a organização das páginas.';
-            notifyListeners();
-          });
-        }
-      }
-
-      notifyListeners();
-    }, onError: (Object _) {
-      carregandoAvaliacoes = false;
-      erroAvaliacoes =
-          'Não foi possível carregar suas avaliações. Confira a conexão e tente novamente.';
-      notifyListeners();
-    });
-
-    // Módulo 2: Turmas e Alunos
-    carregandoTurmas = true;
-    erroTurmas = null;
-    _turmasSub = repo.acompanhar('turmas').listen((docs) {
-      final turmasAtuais = <String, String>{};
-      for (final doc in docs) {
-        final id = doc['id'] as String;
-        final nome = (doc['nome'] as String?)?.trim() ?? '';
-        if (nome.isNotEmpty) {
-          turmasAtuais[id] = nome;
-        }
-      }
-
-      // Cancela listeners de turmas removidas
-      final idsRemovidos = _alunosSubs.keys
-          .where((id) => !turmasAtuais.containsKey(id))
-          .toList();
-      for (final id in idsRemovidos) {
-        _alunosSubs.remove(id)?.cancel();
-        final nomeAntigo = _turmaNomes.remove(id);
-        if (nomeAntigo != null) {
-          _turmaIds.remove(nomeAntigo);
-          _turmas.remove(nomeAntigo);
-        }
-      }
-
-      // Registra e escuta cada turma
-      for (final entry in turmasAtuais.entries) {
-        final id = entry.key;
-        final nome = entry.value;
-        final nomeAnterior = _turmaNomes[id];
-        if (nomeAnterior != null && nomeAnterior != nome) {
-          _turmas[nome] = _turmas.remove(nomeAnterior) ?? [];
-          _turmaIds.remove(nomeAnterior);
-        }
-        _turmaIds[nome] = id;
-        _turmaNomes[id] = nome;
-        _turmas.putIfAbsent(nome, () => []);
-
-        if (!_alunosSubs.containsKey(id)) {
-          _alunosSubs[id] =
-              repo.acompanhar('turmas/$id/alunos').listen((alunosDocs) {
-            final tNome = _turmaNomes[id];
-            if (tNome == null) return;
-            final listaAlunos = <Aluno>[];
-            for (final aDoc in alunosDocs) {
-              try {
-                listaAlunos.add(Aluno.fromMap(aDoc));
+                final a = Avaliacao.fromMap(doc);
+                lista.add(a);
+                idsAtuais.add(a.id);
               } catch (_) {}
             }
-            listaAlunos.sort((a, b) => a.nome.compareTo(b.nome));
-            _turmas[tNome] = listaAlunos;
+            _avaliacoes
+              ..clear()
+              ..addAll(lista);
+            carregandoAvaliacoes = false;
+
+            final idsRemovidos = _variantesSubs.keys
+                .where((id) => !idsAtuais.contains(id))
+                .toList();
+            for (final id in idsRemovidos) {
+              _variantesSubs.remove(id)?.cancel();
+              _gabaritosSubs.remove(id)?.cancel();
+              _correcoesSubs.remove(id)?.cancel();
+              _materiaisSubs.remove(id)?.cancel();
+              _correcoes.remove(id);
+              _variantes.remove(id);
+              _questoes.remove(id);
+              _variantesQuestoesIds.remove(id);
+              _gabaritos.remove(id);
+            }
+
+            for (final a in lista) {
+              final aId = a.id;
+              if (!_variantesSubs.containsKey(aId)) {
+                carregandoDetalhes.add(aId);
+                _detalhesPendentes[aId] = {
+                  'variantes',
+                  'gabaritos',
+                  'correcoes',
+                  'materiais',
+                };
+                _variantesSubs[aId] = repo
+                    .acompanhar('avaliacoes/$aId/variantes')
+                    .listen(
+                      (vDocs) {
+                        if (geracao != _geracao) return;
+                        _variantes[aId] = vDocs;
+                        _detalheCarregado(aId, 'variantes');
+                        final varDoc = vDocs
+                            .where((d) => d['id'] == 'A')
+                            .firstOrNull;
+                        if (varDoc != null && varDoc['questoes'] is List) {
+                          final qIds = (varDoc['questoes'] as List)
+                              .map((e) => e.toString().trim())
+                              .where((e) => e.isNotEmpty)
+                              .toList();
+                          final itens = varDoc['itens'];
+                          if (itens is List) {
+                            _questoes[aId] = itens
+                                .map(
+                                  (v) => Questao.fromMap(
+                                    Map<String, dynamic>.from(v as Map),
+                                  ),
+                                )
+                                .toList();
+                          }
+                          _variantesQuestoesIds[aId] = qIds;
+                          _reconstruirQuestoesAvaliacao(aId);
+                        }
+                        notifyListeners();
+                      },
+                      onError: (Object _) {
+                        erroAvaliacoes =
+                            'Não foi possível carregar os detalhes da avaliação.';
+                        notifyListeners();
+                      },
+                    );
+              }
+
+              if (!_gabaritosSubs.containsKey(aId)) {
+                _gabaritosSubs[aId] = repo
+                    .acompanhar('avaliacoes/$aId/gabaritos')
+                    .listen((gDocs) {
+                      if (geracao != _geracao) return;
+                      _detalheCarregado(aId, 'gabaritos');
+                      final gabDoc =
+                          gDocs.where((d) => d['id'] == 'A').firstOrNull ??
+                          gDocs.firstOrNull;
+                      if (gabDoc != null && gabDoc['respostas'] is List) {
+                        final resps = (gabDoc['respostas'] as List)
+                            .map((e) => e == null ? null : (e as num).toInt())
+                            .toList();
+                        _gabaritos[aId] = resps;
+                        notifyListeners();
+                      }
+                    }, onError: (Object _) {});
+              }
+              if (!_correcoesSubs.containsKey(aId)) {
+                _correcoesSubs[aId] = repo
+                    .acompanhar('avaliacoes/$aId/correcoes')
+                    .listen(
+                      (docs) {
+                        if (geracao != _geracao) return;
+                        final lista = <Correcao>[];
+                        for (final doc in docs) {
+                          try {
+                            final r = Correcao.fromMap(doc);
+                            if (r.respostas.length == a.numQuestoes) {
+                              lista.add(r);
+                            }
+                          } catch (_) {
+                            erroAvaliacoes =
+                                'Uma correção contém dados inválidos.';
+                          }
+                        }
+                        _correcoes[aId] = lista;
+                        _detalheCarregado(aId, 'correcoes');
+                        notifyListeners();
+                      },
+                      onError: (Object _) {
+                        carregandoDetalhes.remove(aId);
+                        erroAvaliacoes =
+                            'Não foi possível carregar as correções.';
+                        notifyListeners();
+                      },
+                    );
+                _materiaisSubs[aId] = repo
+                    .acompanhar('avaliacoes/$aId/materiais')
+                    .listen(
+                      (docs) {
+                        if (geracao != _geracao) return;
+                        _detalheCarregado(aId, 'materiais');
+                        final layout = docs
+                            .where((v) => v['id'] == 'layout')
+                            .firstOrNull;
+                        if (layout?['paginas'] is List) {
+                          _paginas[aId] = (layout!['paginas'] as List)
+                              .map((v) => (v as num).toInt())
+                              .toList();
+                        }
+                        notifyListeners();
+                      },
+                      onError: (Object _) {
+                        erroAvaliacoes =
+                            'Não foi possível carregar a organização das páginas.';
+                        notifyListeners();
+                      },
+                    );
+              }
+            }
+
             notifyListeners();
-          }, onError: (Object _) {});
-        }
-      }
+          },
+          onError: (Object _) {
+            carregandoAvaliacoes = false;
+            erroAvaliacoes =
+                'Não foi possível carregar suas avaliações. Confira a conexão e tente novamente.';
+            notifyListeners();
+          },
+        );
 
-      carregandoTurmas = false;
-      notifyListeners();
-    }, onError: (Object _) {
-      carregandoTurmas = false;
-      erroTurmas = 'Não foi possível carregar as turmas.';
-      notifyListeners();
-    });
+    carregandoTurmas = true;
+    erroTurmas = null;
+    _turmasSub = repo
+        .acompanhar('turmas')
+        .listen(
+          (docs) {
+            final turmasAtuais = <String, String>{};
+            for (final doc in docs) {
+              final id = doc['id'] as String;
+              final nome = (doc['nome'] as String?)?.trim() ?? '';
+              if (nome.isNotEmpty) {
+                turmasAtuais[id] = nome;
+              }
+            }
 
-    // Módulo 2: Disciplinas
+            final idsRemovidos = _alunosSubs.keys
+                .where((id) => !turmasAtuais.containsKey(id))
+                .toList();
+            for (final id in idsRemovidos) {
+              _alunosSubs.remove(id)?.cancel();
+              final nomeAntigo = _turmaNomes.remove(id);
+              if (nomeAntigo != null) {
+                _turmaIds.remove(nomeAntigo);
+                _turmas.remove(nomeAntigo);
+              }
+            }
+
+            for (final entry in turmasAtuais.entries) {
+              final id = entry.key;
+              final nome = entry.value;
+              final nomeAnterior = _turmaNomes[id];
+              if (nomeAnterior != null && nomeAnterior != nome) {
+                _turmas[nome] = _turmas.remove(nomeAnterior) ?? [];
+                _turmaIds.remove(nomeAnterior);
+              }
+              _turmaIds[nome] = id;
+              _turmaNomes[id] = nome;
+              _turmas.putIfAbsent(nome, () => []);
+
+              if (!_alunosSubs.containsKey(id)) {
+                _alunosSubs[id] = repo.acompanhar('turmas/$id/alunos').listen((
+                  alunosDocs,
+                ) {
+                  final tNome = _turmaNomes[id];
+                  if (tNome == null) return;
+                  final listaAlunos = <Aluno>[];
+                  for (final aDoc in alunosDocs) {
+                    try {
+                      listaAlunos.add(Aluno.fromMap(aDoc));
+                    } catch (_) {}
+                  }
+                  listaAlunos.sort((a, b) => a.nome.compareTo(b.nome));
+                  _turmas[tNome] = listaAlunos;
+                  notifyListeners();
+                }, onError: (Object _) {});
+              }
+            }
+
+            carregandoTurmas = false;
+            notifyListeners();
+          },
+          onError: (Object _) {
+            carregandoTurmas = false;
+            erroTurmas = 'Não foi possível carregar as turmas.';
+            notifyListeners();
+          },
+        );
+
     _disciplinasSub = repo.acompanhar('disciplinas').listen((docs) {
       _disciplinasRemotas.clear();
       for (final doc in docs) {
@@ -292,32 +316,35 @@ class SessionStore extends ChangeNotifier {
       notifyListeners();
     }, onError: (Object _) {});
 
-    // Módulo 3: Banco de Questões
     carregandoQuestoes = true;
     erroQuestoes = null;
-    _questoesSub = repo.acompanhar('questoes').listen((docs) {
-      final lista = <Questao>[];
-      for (final doc in docs) {
-        try {
-          lista.add(Questao.fromMap(doc));
-        } catch (_) {}
-      }
-      _bancoQuestoes
-        ..clear()
-        ..addAll(lista);
-      carregandoQuestoes = false;
+    _questoesSub = repo
+        .acompanhar('questoes')
+        .listen(
+          (docs) {
+            final lista = <Questao>[];
+            for (final doc in docs) {
+              try {
+                lista.add(Questao.fromMap(doc));
+              } catch (_) {}
+            }
+            _bancoQuestoes
+              ..clear()
+              ..addAll(lista);
+            carregandoQuestoes = false;
 
-      // Re-resolve as questões selecionadas de todas as avaliações
-      for (final aId in _variantesQuestoesIds.keys) {
-        _reconstruirQuestoesAvaliacao(aId);
-      }
+            for (final aId in _variantesQuestoesIds.keys) {
+              _reconstruirQuestoesAvaliacao(aId);
+            }
 
-      notifyListeners();
-    }, onError: (Object _) {
-      carregandoQuestoes = false;
-      erroQuestoes = 'Não foi possível carregar o banco de questões.';
-      notifyListeners();
-    });
+            notifyListeners();
+          },
+          onError: (Object _) {
+            carregandoQuestoes = false;
+            erroQuestoes = 'Não foi possível carregar o banco de questões.';
+            notifyListeners();
+          },
+        );
   }
 
   void _detalheCarregado(String id, String tipo) {
@@ -350,9 +377,12 @@ class SessionStore extends ChangeNotifier {
     if (lista.length == qIds.length) {
       _questoes[avaliacaoId] = lista;
       _gabaritos.putIfAbsent(
-          avaliacaoId,
-          () => List<int?>.generate(avaliacao(avaliacaoId).numQuestoes,
-              (i) => i < lista.length ? lista[i].correta : null));
+        avaliacaoId,
+        () => List<int?>.generate(
+          avaliacao(avaliacaoId).numQuestoes,
+          (i) => i < lista.length ? lista[i].correta : null,
+        ),
+      );
     }
     notifyListeners();
   }
@@ -369,7 +399,7 @@ class SessionStore extends ChangeNotifier {
     _variantes.clear();
     _turmasPendentes.clear();
     carregandoDetalhes.clear();
-    autenticacao = null;
+    pontuacaoPadrao = 1000;
     _avaliacoesSub?.cancel();
     _avaliacoesSub = null;
     _turmasSub?.cancel();
@@ -428,7 +458,8 @@ class SessionStore extends ChangeNotifier {
   }
 
   Future<void> _gravar(
-      Future<void> Function(FirestoreRepository repo) operacao) async {
+    Future<void> Function(FirestoreRepository repo) operacao,
+  ) async {
     final repo = _repo;
     if (repo == null) return;
     try {
@@ -442,7 +473,6 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
-  // Consultas
   List<Avaliacao> get avaliacoes => List.unmodifiable(_avaliacoes);
   Avaliacao avaliacao(String id) => _avaliacoes.firstWhere((a) => a.id == id);
   Avaliacao? avaliacaoOuNull(String id) =>
@@ -450,11 +480,10 @@ class SessionStore extends ChangeNotifier {
   List<Aluno> alunos(String turma) => List.unmodifiable(_turmas[turma] ?? []);
   List<String> get turmas => _turmas.keys.toList()..sort();
   List<String> get disciplinas => {
-        ..._disciplinasRemotas,
-        ..._avaliacoes.map((a) => a.disciplina),
-        ..._bancoQuestoes.map((q) => q.disciplina),
-      }.where((d) => d.trim().isNotEmpty).toList()
-        ..sort();
+    ..._disciplinasRemotas,
+    ..._avaliacoes.map((a) => a.disciplina),
+    ..._bancoQuestoes.map((q) => q.disciplina),
+  }.where((d) => d.trim().isNotEmpty).toList()..sort();
 
   List<int?> gabarito(String id) {
     final a = avaliacaoOuNull(id);
@@ -489,31 +518,43 @@ class SessionStore extends ChangeNotifier {
   List<Questao> get bancoQuestoes => List.unmodifiable(_bancoQuestoes);
 
   List<int> paginas(String id) => List.unmodifiable(
-      _paginas[id] ?? List.generate(avaliacao(id).numQuestoes, (q) => q ~/ 3));
+    _paginas[id] ?? List.generate(avaliacao(id).numQuestoes, (q) => q ~/ 5),
+  );
 
   Future<void> salvarPaginas(String id, List<int> paginas) async {
     if (paginas.length != avaliacao(id).numQuestoes ||
         paginas.any((v) => v < 0 || v >= 60)) {
       throw ArgumentError('Organização de páginas inválida.');
     }
-    await _gravar((repo) => repo.salvar('avaliacoes/$id/materiais', 'layout',
-        {'tipo': 'layout', 'paginas': paginas}));
+    await _gravar(
+      (repo) => repo.salvar('avaliacoes/$id/materiais', 'layout', {
+        'tipo': 'layout',
+        'paginas': paginas,
+      }),
+    );
     _paginas[id] = [...paginas];
     notifyListeners();
   }
 
   double media(String id) {
     final lista = correcoes(id);
+    final a = avaliacao(id), key = gabarito(id);
     return lista.isEmpty
         ? 0
-        : lista.map((r) => r.nota(gabarito(id))).reduce((a, b) => a + b) /
-            lista.length;
+        : lista.map((r) => r.nota(key, a)).reduce((a, b) => a + b) /
+              lista.length;
   }
 
-  // Avaliações
   Future<void> salvar(Avaliacao a) async {
+    a.validarPontuacao();
     final index = _avaliacoes.indexWhere((e) => e.id == a.id);
     final backup = index >= 0 ? _avaliacoes[index] : null;
+    if (backup != null &&
+        correcoes(a.id).isNotEmpty &&
+        (a.limitePontos != backup.limitePontos ||
+            !listEquals(a.pesos, backup.pesos))) {
+      throw StateError('Os pesos são preservados após a primeira correção.');
+    }
     if (index < 0) {
       _avaliacoes.insert(0, a);
     } else {
@@ -578,12 +619,14 @@ class SessionStore extends ChangeNotifier {
     final a = avaliacao(id);
     if (r.respostas.length != a.numQuestoes ||
         r.precisaRevisao ||
-        r.respostas
-            .any((v) => v != null && (v < 0 || v >= a.numAlternativas))) {
+        r.respostas.any(
+          (v) => v != null && (v < 0 || v >= a.numAlternativas),
+        )) {
       throw ArgumentError('Revise todas as respostas antes de salvar.');
     }
-    await _gravar((repo) =>
-        repo.salvar('avaliacoes/$id/correcoes', r.alunoId, r.toMap()));
+    await _gravar(
+      (repo) => repo.salvar('avaliacoes/$id/correcoes', r.alunoId, r.toMap()),
+    );
     final lista = _correcoes.putIfAbsent(id, () => []);
     final index = lista.indexWhere((v) => v.alunoId == r.alunoId);
     if (index >= 0) {
@@ -603,7 +646,7 @@ class SessionStore extends ChangeNotifier {
         'variantes',
         'gabaritos',
         'correcoes',
-        'materiais'
+        'materiais',
       ]) {
         await repo.excluirColecao('avaliacoes/$id/$filha');
       }
@@ -636,10 +679,11 @@ class SessionStore extends ChangeNotifier {
     _questoes[novoId] = [...qList];
     _paginas[novoId] = [...pList];
     final nova = a.copyWith(
-        id: novoId,
-        codigo: 'EG-${novoId.substring(novoId.length - 6)}',
-        nome: '${a.nome} · cópia',
-        status: StatusAvaliacao.rascunho);
+      id: novoId,
+      codigo: 'EG-${novoId.substring(novoId.length - 6)}',
+      nome: '${a.nome} · cópia',
+      status: StatusAvaliacao.rascunho,
+    );
 
     await salvar(nova);
     if (qList.isNotEmpty) {
@@ -649,12 +693,12 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
-  // Turmas e alunos
   Future<void> adicionarTurma(String nome) {
     final t = nome.trim();
     if (t.isEmpty || t.length > 200) {
       return Future.error(
-          ArgumentError('Informe um nome de até 200 caracteres.'));
+        ArgumentError('Informe um nome de até 200 caracteres.'),
+      );
     }
     if (_turmasPendentes.containsKey(t)) return _turmasPendentes[t]!;
     if (_turmas.containsKey(t)) {
@@ -686,11 +730,13 @@ class SessionStore extends ChangeNotifier {
     final id = _turmaIds[antigo];
     final avaliacoes = _avaliacoes.where((a) => a.turma == antigo).toList();
     if (id != null) {
-      await _gravar((repo) => repo.gravarLote({
-            'turmas/$id': {'nome': nomeNovo},
-            for (final a in avaliacoes)
-              'avaliacoes/${a.id}': a.copyWith(turma: nomeNovo).toMap(),
-          }));
+      await _gravar(
+        (repo) => repo.gravarLote({
+          'turmas/$id': {'nome': nomeNovo},
+          for (final a in avaliacoes)
+            'avaliacoes/${a.id}': a.copyWith(turma: nomeNovo).toMap(),
+        }),
+      );
     }
     final listaAnterior = _turmas.remove(antigo);
     _turmas.putIfAbsent(nomeNovo, () => listaAnterior ?? alunosAnteriores);
@@ -714,7 +760,8 @@ class SessionStore extends ChangeNotifier {
     final id = _turmaIds[turma];
     if (id != null) {
       await _gravar(
-          (repo) => repo.salvar('turmas/$id/alunos', aluno.id, aluno.toMap()));
+        (repo) => repo.salvar('turmas/$id/alunos', aluno.id, aluno.toMap()),
+      );
     }
     final lista = _turmas[turma];
     final index = lista?.indexWhere((v) => v.id == aluno.id) ?? -1;
@@ -725,12 +772,14 @@ class SessionStore extends ChangeNotifier {
   Future<void> removerTurma(String nome) async {
     if (carregandoAvaliacoes) {
       throw StateError(
-          'Aguarde o carregamento das avaliações antes de excluir a turma.');
+        'Aguarde o carregamento das avaliações antes de excluir a turma.',
+      );
     }
     final turmaNome = nome.trim();
     if (_avaliacoes.any((a) => a.turma == turmaNome)) {
       throw StateError(
-          'Esta turma está vinculada a uma avaliação. Exclua ou transfira as avaliações antes.');
+        'Esta turma está vinculada a uma avaliação. Exclua ou transfira as avaliações antes.',
+      );
     }
     final id = _turmaIds[turmaNome];
     if (id != null) {
@@ -796,7 +845,6 @@ class SessionStore extends ChangeNotifier {
     }
   }
 
-  // Questões
   Future<void> adicionarQuestao(Questao questao) async {
     final index = _bancoQuestoes.indexWhere((q) => q.id == questao.id);
     final backup = index >= 0 ? _bancoQuestoes[index] : null;
@@ -813,8 +861,9 @@ class SessionStore extends ChangeNotifier {
         if (questao.disciplina.trim().isNotEmpty) {
           final idDisc = _sanitizarId(questao.disciplina);
           if (idDisc.isNotEmpty) {
-            await repo.salvar(
-                'disciplinas', idDisc, {'nome': questao.disciplina.trim()});
+            await repo.salvar('disciplinas', idDisc, {
+              'nome': questao.disciplina.trim(),
+            });
           }
         }
       });
@@ -849,28 +898,35 @@ class SessionStore extends ChangeNotifier {
     final backupQuestoes = _questoes[id];
     if (correcoes(id).isNotEmpty || carregandoDetalhes.contains(id)) {
       throw StateError(
-          'Aguarde as correções carregarem. A composição é preservada após a primeira correção.');
+        'Aguarde as correções carregarem. A composição é preservada após a primeira correção.',
+      );
     }
     if (selecionadas.length > a.numQuestoes ||
         selecionadas.any((q) => q.alternativas.length != a.numAlternativas)) {
       throw ArgumentError(
-          'As questões devem ter o mesmo formato da avaliação.');
+        'As questões devem ter o mesmo formato da avaliação.',
+      );
     }
     final backupQIds = _variantesQuestoesIds[id];
     final backupGabarito = _gabaritos[id];
+    final backupVariantes = _variantes[id];
+    final invalidarModelos =
+        backupVariantes?.any((v) => v['id'] != 'A') ?? false;
 
     _variantes[id] = [
-      ...(_variantes[id] ?? []).where((v) => v['id'] != 'A'),
+      if (invalidarModelos) {'id': 'modelos', 'modelos': []},
       {
         'id': 'A',
         'questoes': qIds,
-        'itens': selecionadas.map((q) => {...q.toMap(), 'id': q.id}).toList()
-      }
+        'itens': selecionadas.map((q) => {...q.toMap(), 'id': q.id}).toList(),
+      },
     ];
     _questoes[id] = [...selecionadas];
     _variantesQuestoesIds[id] = qIds;
-    final gab = List<int?>.generate(a.numQuestoes,
-        (q) => q < selecionadas.length ? selecionadas[q].correta : null);
+    final gab = List<int?>.generate(
+      a.numQuestoes,
+      (q) => q < selecionadas.length ? selecionadas[q].correta : null,
+    );
     _gabaritos[id] = gab;
     notifyListeners();
 
@@ -879,10 +935,16 @@ class SessionStore extends ChangeNotifier {
         await repo.gravarLote({
           'avaliacoes/$id/variantes/A': {
             'questoes': qIds,
-            'itens':
-                selecionadas.map((q) => {...q.toMap(), 'id': q.id}).toList()
+            'itens': selecionadas
+                .map((q) => {...q.toMap(), 'id': q.id})
+                .toList(),
           },
           'avaliacoes/$id/gabaritos/A': {'respostas': gab},
+          if (invalidarModelos)
+            'avaliacoes/$id/variantes/modelos': {
+              'questoes': qIds,
+              'modelos': [],
+            },
         });
       });
 
@@ -890,6 +952,11 @@ class SessionStore extends ChangeNotifier {
         await salvar(a.copyWith(status: StatusAvaliacao.agendada));
       }
     } catch (e) {
+      if (backupVariantes == null) {
+        _variantes.remove(id);
+      } else {
+        _variantes[id] = backupVariantes;
+      }
       _questoes[id] = backupQuestoes ?? [];
       _variantesQuestoesIds[id] = backupQIds ?? [];
       if (backupGabarito == null) {
@@ -903,91 +970,163 @@ class SessionStore extends ChangeNotifier {
   }
 
   void atualizarPerfil(
-      String novoNome, String novoEmail, String novaInstituicao) {
+    String novoNome,
+    String novoEmail,
+    String novaInstituicao,
+  ) {
     nome = novoNome;
     email = novoEmail;
     instituicao = novaInstituicao;
     notifyListeners();
   }
 
-  void movimento(bool value) {
-    reduzirMovimento = value;
-    notifyListeners();
+  List<Map<String, dynamic>> variantes(String id) {
+    final documentos = _variantes[id] ?? [];
+    final grupos = documentos.where((v) => v['id'] == 'modelos').firstOrNull;
+    return List.unmodifiable(
+      grupos == null
+          ? documentos
+          : [
+              ...documentos.where((v) => v['id'] == 'A'),
+              ...(grupos['modelos'] as List).map(
+                (v) => Map<String, dynamic>.from(v as Map),
+              ),
+            ],
+    );
   }
 
-  List<Map<String, dynamic>> variantes(String id) =>
-      List.unmodifiable(_variantes[id] ?? []);
   Map<String, dynamic>? variante(String id, String versao) =>
       variantes(id).where((v) => v['id'] == versao).firstOrNull;
 
+  String rotuloVersao(String id, String versao) =>
+      variante(id, versao)?['rotulo'] as String? ?? versao;
+
   Future<Map<String, dynamic>?> carregarVariante(
-          String id, String versao) async =>
-      variante(id, versao) ??
-      await _repo?.obter('avaliacoes/$id/variantes', versao);
+    String id,
+    String versao,
+  ) async {
+    final local = variante(id, versao);
+    if (local != null ||
+        versao == 'A' ||
+        (_variantes[id] ?? []).any((v) => v['id'] == 'modelos')) {
+      return local;
+    }
+    return _repo?.obter('avaliacoes/$id/variantes', versao);
+  }
 
   Future<void> salvarPerfil(String novoNome, String novaInstituicao) async {
     final n = novoNome.trim(), i = novaInstituicao.trim();
     if (n.isEmpty || n.length > 200 || i.length > 200) {
       throw ArgumentError('Confira o nome e a instituição.');
     }
-    await _gravar((repo) => repo.salvarPerfil({
-          'nome': n,
-          'email': email,
-          'instituicao': i,
-          'reduzirMovimento': reduzirMovimento
-        }));
+    await _gravar(
+      (repo) =>
+          repo.salvarPerfil({'nome': n, 'email': email, 'instituicao': i}),
+    );
     atualizarPerfil(n, email, i);
   }
 
-  Future<void> salvarMovimento(bool valor) async {
-    await _gravar((repo) => repo.salvarPerfil({
-          'nome': nome,
-          'email': email,
-          'instituicao': instituicao,
-          'reduzirMovimento': valor
-        }));
-    movimento(valor);
+  Future<void> carregarPontuacaoPadrao() async {
+    final uid = _repo?.usuarioId;
+    if (uid == null) return;
+    final geracao = _geracao;
+    try {
+      final valor = await lerPontuacaoPadrao(uid);
+      if (geracao != _geracao) return;
+      pontuacaoPadrao = Avaliacao.lerLimite(valor);
+      notifyListeners();
+    } catch (_) {
+      // O perfil continua disponível se a preferência local falhar.
+    }
   }
 
-  Future<void> gerarVariantes(String id) async {
+  Future<void> salvarPontuacaoPadrao(int valor) async {
+    if (Avaliacao.lerLimite(valor) != valor) {
+      throw ArgumentError('Use uma pontuação entre 1 e 10.');
+    }
+    final uid = _repo?.usuarioId;
+    final geracao = _geracao;
+    if (uid != null) await gravarPontuacaoPadrao(uid, valor);
+    if (geracao != _geracao) return;
+    pontuacaoPadrao = valor;
+    notifyListeners();
+  }
+
+  Future<void> gerarVariantes(
+    String id, {
+    bool embaralharQuestoes = true,
+    bool embaralharAlternativas = true,
+  }) async {
+    if (!embaralharQuestoes && !embaralharAlternativas) {
+      throw ArgumentError('Escolha o que será embaralhado.');
+    }
     final a = avaliacao(id);
     if (carregandoDetalhes.contains(id) || correcoes(id).isNotEmpty) {
       throw StateError(
-          'As versões não podem ser alteradas após iniciar as correções.');
+        'As versões não podem ser alteradas após iniciar as correções.',
+      );
     }
     if (questoes(id).length != a.numQuestoes || !gabaritoPronto(id)) {
       throw StateError(
-          'Selecione todas as questões e defina o gabarito antes de embaralhar.');
+        'Selecione todas as questões e defina o gabarito antes de embaralhar.',
+      );
     }
     final alunosDaTurma = alunos(a.turma);
     if (alunosDaTurma.isEmpty) {
       throw StateError('Cadastre os alunos antes de gerar as versões.');
     }
-    final versoes = <Map<String, dynamic>>[];
-    final antigos = variantes(id).where((v) => v['id'] != 'A').toList();
-    for (final antigo in antigos) {
-      await _gravar((repo) =>
-          repo.excluir('avaliacoes/$id/variantes', antigo['id'] as String));
-    }
+    final alunosIds = alunosDaTurma.map((aluno) => aluno.id).toList()..sort();
+    final geracao = _geracao;
+    final aleatorio = Random.secure();
+    final codigo = List.generate(
+      14,
+      (_) => aleatorio.nextInt(36).toRadixString(36),
+    ).join();
     final random = Random();
-    for (var i = 0; i < alunosDaTurma.length; i++) {
-      final ordem = List.generate(a.numQuestoes, (q) => q)..shuffle(random);
-      final alternativas = List.generate(a.numQuestoes,
-          (_) => List.generate(a.numAlternativas, (j) => j)..shuffle(random));
-      final v = {
-        'id': 'V${i + 1}',
-        'questoes': ordem.map((q) => questoes(id)[q].id).toList(),
-        'alunoId': alunosDaTurma[i].id,
-        'ordemQuestoes': ordem,
-        'ordemAlternativas': alternativas.map((v) => {'valores': v}).toList()
-      };
-      await _gravar((repo) =>
-          repo.salvar('avaliacoes/$id/variantes', v['id'] as String, v));
-      versoes.add(v);
+    List<int> ordem(int tamanho, bool embaralhar) {
+      final indices = List.generate(tamanho, (i) => i);
+      if (embaralhar && tamanho > 1) {
+        indices.shuffle(random);
+        if (indices.asMap().entries.every((item) => item.key == item.value)) {
+          indices.add(indices.removeAt(0));
+        }
+      }
+      return indices;
     }
+
+    final dados = {
+      'questoes': questoes(id).map((q) => q.id).toList(),
+      'modelos': [
+        for (var modelo = 0; modelo < 2; modelo++)
+          {
+            'id': '$codigo-${modelo == 0 ? 'A' : 'B'}',
+            'rotulo': modelo == 0 ? 'A' : 'B',
+            'alunos': [
+              for (var i = modelo; i < alunosIds.length; i += 2) alunosIds[i],
+            ],
+            'ordemQuestoes': ordem(
+              a.numQuestoes,
+              modelo == 1 && embaralharQuestoes,
+            ),
+            'ordemAlternativas': List.generate(
+              a.numQuestoes,
+              (_) => {
+                'valores': ordem(
+                  a.numAlternativas,
+                  modelo == 1 && embaralharAlternativas,
+                ),
+              },
+            ),
+          },
+      ],
+    };
+    await _gravar(
+      (repo) => repo.salvar('avaliacoes/$id/variantes', 'modelos', dados),
+    );
+    if (geracao != _geracao) return;
     _variantes[id] = [
-      ...variantes(id).where((v) => v['id'] == 'A'),
-      ...versoes
+      ...(_variantes[id] ?? []).where((v) => v['id'] == 'A'),
+      {...dados, 'id': 'modelos'},
     ];
     notifyListeners();
   }
@@ -1005,9 +1144,11 @@ class SessionStore extends ChangeNotifier {
 }
 
 class SessionScope extends InheritedNotifier<SessionStore> {
-  const SessionScope(
-      {super.key, required SessionStore store, required super.child})
-      : super(notifier: store);
+  const SessionScope({
+    super.key,
+    required SessionStore store,
+    required super.child,
+  }) : super(notifier: store);
   static SessionStore of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<SessionScope>()!.notifier!;
 }
