@@ -25,6 +25,7 @@ tmp/
 .pub-cache/
 .pub/
 /build/
+/android/build/
 node_modules/
 .firebase/
 *-debug.log

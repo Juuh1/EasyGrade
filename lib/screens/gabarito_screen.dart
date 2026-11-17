@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
+import '../models/avaliacao.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
 import 'detalhes_avaliacao_screen.dart';
@@ -8,10 +9,11 @@ import 'leitura_screen.dart';
 class GabaritoScreen extends StatefulWidget {
   final String avaliacaoId;
   final bool abrirDetalhesAoSalvar;
-  const GabaritoScreen(
-      {super.key,
-      required this.avaliacaoId,
-      this.abrirDetalhesAoSalvar = false});
+  const GabaritoScreen({
+    super.key,
+    required this.avaliacaoId,
+    this.abrirDetalhesAoSalvar = false,
+  });
   @override
   State<GabaritoScreen> createState() => _GabaritoScreenState();
 }
@@ -29,9 +31,12 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
       return;
     }
     if (store.correcoes(widget.avaliacaoId).isNotEmpty && _alterado) {
-      if (!await confirmar(context, 'Atualizar o gabarito?',
-          'As notas desta sessão serão recalculadas com as novas respostas.',
-          action: 'Atualizar notas')) {
+      if (!await confirmar(
+        context,
+        'Atualizar o gabarito?',
+        'As notas salvas serão recalculadas com as novas respostas.',
+        action: 'Atualizar notas',
+      )) {
         return;
       }
       if (!mounted) return;
@@ -47,14 +52,18 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
         return;
       }
       Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (_) =>
-                  DetalhesAvaliacaoScreen(avaliacaoId: widget.avaliacaoId)));
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              DetalhesAvaliacaoScreen(avaliacaoId: widget.avaliacaoId),
+        ),
+      );
     } catch (erro) {
       if (mounted) {
-        avisar(context,
-            'Não foi possível salvar o gabarito: ${mensagemErro(erro)}');
+        avisar(
+          context,
+          'Não foi possível salvar o gabarito: ${mensagemErro(erro)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -69,94 +78,134 @@ class _GabaritoScreenState extends State<GabaritoScreen> {
     final a = store.avaliacaoOuNull(widget.avaliacaoId);
     if (a == null) {
       return const AppPage(
-          title: 'Gabarito de referência',
-          child: Center(child: CircularProgressIndicator()));
+        title: 'Gabarito de referência',
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     if (!_alterado) {
       _respostas = [...store.gabarito(a.id)];
     }
     final preenchidas = _respostas?.where((r) => r != null).length ?? 0;
     return AppPage(
-        title: 'Gabarito de referência',
-        bottom: ElevatedButton(
-            onPressed: _salvando ? null : _salvar,
-            child: _salvando
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : Text('Salvar gabarito · $preenchidas/${a.numQuestoes}')),
-        child: ListView(padding: const EdgeInsets.all(24), children: [
+      title: 'Gabarito de referência',
+      bottom: ElevatedButton(
+        onPressed: _salvando ? null : _salvar,
+        child: _salvando
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text('Salvar gabarito · $preenchidas/${a.numQuestoes}'),
+      ),
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
           PageHeading(
-              title: 'Gabarito de referência',
-              subtitle:
-                  '${a.nome}\nMarque a alternativa correta de cada questão.'),
+            title: 'Gabarito de referência',
+            subtitle:
+                '${a.nome}\nMarque a alternativa correta de cada questão.',
+          ),
           ActionTile(
-              icon: Icons.document_scanner_outlined,
-              title: 'Ler gabarito pela câmera',
-              subtitle:
-                  'Fotografe o gabarito na folha de respostas do EasyGrade.',
-              onTap: _salvando
-                  ? null
-                  : () async {
-                      final result = await Navigator.push<List<int?>>(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => CapturaScreen(
-                                  avaliacaoId: a.id, gabarito: true)));
-                      if (mounted && result != null) {
-                        setState(() {
-                          _respostas = result;
-                          _alterado = true;
-                        });
-                      }
-                    }),
+            icon: Icons.document_scanner_outlined,
+            title: 'Ler gabarito pela câmera',
+            subtitle:
+                'Fotografe o gabarito na folha de respostas do EasyGrade.',
+            onTap: _salvando
+                ? null
+                : () async {
+                    final result = await Navigator.push<List<int?>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            CapturaScreen(avaliacaoId: a.id, gabarito: true),
+                      ),
+                    );
+                    if (mounted && result != null) {
+                      setState(() {
+                        _respostas = result;
+                        _alterado = true;
+                      });
+                    }
+                  },
+          ),
           const SizedBox(height: 10),
-          const InfoBanner(
-              'Use a versão A como referência. As versões embaralhadas preservam a equivalência das respostas. Questões têm peso igual; a nota vai de 0 a 10.'),
+          InfoBanner(
+            'Use a ordem original das questões. A correção aplica o gabarito e os pesos à versão identificada no QR. Total: ${formatarPontos(a.totalPontos)} pontos.',
+          ),
           const SizedBox(height: 20),
           SurfaceCard(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Column(children: [
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Column(
+              children: [
                 for (var q = 0; q < a.numQuestoes; q++) ...[
                   Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(children: [
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
                         SizedBox(
-                            width: 40,
-                            child: Text((q + 1).toString().padLeft(2, '0'),
+                          width: 40,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (q + 1).toString().padLeft(2, '0'),
                                 style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textSecondary))),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                '${formatarPontos(a.pontos[q])} pt',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         Expanded(
-                            child:
-                                Wrap(alignment: WrapAlignment.end, children: [
-                          for (var alt = 0; alt < a.numAlternativas; alt++)
-                            AnswerBubble(
-                                index: alt,
-                                selected: _respostas != null &&
-                                    _respostas!.length > q &&
-                                    _respostas![q] == alt,
-                                onTap: _salvando
-                                    ? null
-                                    : () => setState(() {
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            children: [
+                              for (var alt = 0; alt < a.numAlternativas; alt++)
+                                AnswerBubble(
+                                  index: alt,
+                                  selected:
+                                      _respostas != null &&
+                                      _respostas!.length > q &&
+                                      _respostas![q] == alt,
+                                  onTap: _salvando
+                                      ? null
+                                      : () => setState(() {
                                           if (_respostas == null ||
                                               _respostas!.length <
                                                   a.numQuestoes) {
                                             _respostas = [
-                                              ...store.gabarito(a.id)
+                                              ...store.gabarito(a.id),
                                             ];
                                           }
                                           _respostas![q] = alt;
                                           _alterado = true;
-                                        }))
-                        ]))
-                      ])),
+                                        }),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   if (q != a.numQuestoes - 1) const Divider(),
-                ]
-              ])),
-        ]));
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

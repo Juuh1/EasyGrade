@@ -40,35 +40,36 @@ class _EasyGradeAppState extends State<EasyGradeApp> {
 
   @override
   Widget build(BuildContext context) => SessionScope(
-      store: _store,
-      child: MaterialApp(
-        title: 'EasyGrade',
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        locale: const Locale('pt', 'BR'),
-        supportedLocales: const [Locale('pt', 'BR')],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        builder: (context, child) {
-          final media = MediaQuery.of(context);
-          final store = SessionScope.of(context);
-          return Container(
-              color: AppColors.pageBackground,
-              alignment: Alignment.center,
-              child: Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  decoration: const BoxDecoration(boxShadow: [
-                    BoxShadow(color: Color(0x16342047), blurRadius: 40)
-                  ]),
-                  child: MediaQuery(
-                      data: media.copyWith(
-                          size: Size(math.min(600, media.size.width),
-                              media.size.height),
-                          disableAnimations: store.reduzirMovimento ||
-                              media.disableAnimations),
-                      child: child!)));
-        },
-        home: AuthenticationGate(authService: widget.authService),
-      ));
+    store: _store,
+    child: MaterialApp(
+      title: 'EasyGrade',
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(),
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return Container(
+          color: AppColors.pageBackground,
+          alignment: Alignment.center,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 600),
+            decoration: const BoxDecoration(
+              boxShadow: [BoxShadow(color: Color(0x16342047), blurRadius: 40)],
+            ),
+            child: MediaQuery(
+              data: media.copyWith(
+                size: Size(math.min(600, media.size.width), media.size.height),
+              ),
+              child: child!,
+            ),
+          ),
+        );
+      },
+      home: AuthenticationGate(authService: widget.authService),
+    ),
+  );
 }
 
 class AuthenticationGate extends StatefulWidget {
@@ -80,8 +81,7 @@ class AuthenticationGate extends StatefulWidget {
 
 class _AuthenticationGateState extends State<AuthenticationGate> {
   bool _abriu = false;
-  late final Stream<User?>? _conta =
-      widget.authService?.auth.authStateChanges();
+  late final Stream<User?>? _conta = widget.authService?.auth.userChanges();
   @override
   Widget build(BuildContext context) {
     if (!_abriu) {
@@ -90,19 +90,21 @@ class _AuthenticationGateState extends State<AuthenticationGate> {
     final service = widget.authService;
     if (service != null) {
       return StreamBuilder<User?>(
-          stream: _conta,
-          initialData: service.auth.currentUser,
-          builder: (context, snapshot) {
-            final user = snapshot.data;
-            if (user == null) {
-              return LoginScreen(authService: service, onLogin: () {});
-            }
-            return _SessaoAutenticada(
-                key: ValueKey(user.uid),
-                user: user,
-                service: service,
-                store: SessionScope.of(context));
-          });
+        stream: _conta,
+        initialData: service.auth.currentUser,
+        builder: (context, snapshot) {
+          final user = snapshot.data;
+          if (user == null) {
+            return LoginScreen(authService: service, onLogin: () {});
+          }
+          return _SessaoAutenticada(
+            key: ValueKey(user.uid),
+            user: user,
+            service: service,
+            store: SessionScope.of(context),
+          );
+        },
+      );
     }
     return LoginScreen(onLogin: () {});
   }
@@ -112,11 +114,12 @@ class _SessaoAutenticada extends StatefulWidget {
   final User user;
   final AuthService service;
   final SessionStore store;
-  const _SessaoAutenticada(
-      {super.key,
-      required this.user,
-      required this.service,
-      required this.store});
+  const _SessaoAutenticada({
+    super.key,
+    required this.user,
+    required this.service,
+    required this.store,
+  });
   @override
   State<_SessaoAutenticada> createState() => _SessaoAutenticadaState();
 }
@@ -124,24 +127,33 @@ class _SessaoAutenticada extends StatefulWidget {
 class _SessaoAutenticadaState extends State<_SessaoAutenticada> {
   late Future<void> _perfil = _carregar();
 
-  @override
-  void initState() {
-    super.initState();
-    widget.store.conectar(widget.service.dados, auth: widget.service);
-  }
+  bool _conectada = false;
 
   @override
   void dispose() {
-    widget.store.desconectar(notificar: false);
+    if (_conectada) widget.store.desconectar(notificar: false);
     super.dispose();
   }
 
   Future<void> _carregar() async {
+    final token = await widget.user.getIdTokenResult();
+    if (!mounted) return;
+    if (!const {'google.com', 'password'}.contains(token.signInProvider)) {
+      await widget.service.sair();
+      return;
+    }
     final perfil = await widget.service.carregarPerfil(widget.user);
     if (!mounted) return;
-    widget.store.atualizarPerfil(perfil['nome'] as String,
-        widget.user.email ?? '', perfil['instituicao'] as String? ?? '');
-    widget.store.movimento(perfil['reduzirMovimento'] == true);
+    if (!_conectada) {
+      widget.store.conectar(widget.service.dados);
+      _conectada = true;
+    }
+    widget.store.atualizarPerfil(
+      perfil['nome'] as String,
+      widget.user.email ?? '',
+      perfil['instituicao'] as String? ?? '',
+    );
+    await widget.store.carregarPontuacaoPadrao();
   }
 
   Future<void> _sair() async {
@@ -154,42 +166,62 @@ class _SessaoAutenticadaState extends State<_SessaoAutenticada> {
 
   @override
   Widget build(BuildContext context) => FutureBuilder<void>(
-      future: _perfil,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
-        }
-        if (snapshot.hasError) {
-          return Scaffold(
-              body: SafeArea(
-                  child: Center(
-                      child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child:
-                              Column(mainAxisSize: MainAxisSize.min, children: [
-                            const InfoBanner(
-                                'Não foi possível carregar seu perfil. Confira a conexão e tente novamente.',
-                                warning: true),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                                onPressed: () =>
-                                    setState(() => _perfil = _carregar()),
-                                child: const Text('Tentar novamente')),
-                            TextButton(
-                                onPressed: _sair,
-                                child: const Text('Sair da conta')),
-                          ])))));
-        }
-        return MainNavigationShell(onLogout: _sair);
-      });
+    future: _perfil,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      if (snapshot.hasError) {
+        return Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const InfoBanner(
+                      'Não foi possível carregar seu perfil. Confira a conexão e tente novamente.',
+                      warning: true,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => setState(() => _perfil = _carregar()),
+                      child: const Text('Tentar novamente'),
+                    ),
+                    TextButton(
+                      onPressed: _sair,
+                      child: const Text('Sair da conta'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+      final fotoGoogle = widget.user.providerData
+          .where((conta) => conta.providerId == 'google.com')
+          .firstOrNull
+          ?.photoURL;
+      return MainNavigationShell(
+        onLogout: _sair,
+        fotoPerfilUrl: fotoGoogle ?? widget.user.photoURL,
+      );
+    },
+  );
 }
 
 class MainNavigationShell extends StatefulWidget {
   final int initialIndex;
   final VoidCallback onLogout;
-  const MainNavigationShell(
-      {super.key, this.initialIndex = 0, required this.onLogout});
+  final String? fotoPerfilUrl;
+  const MainNavigationShell({
+    super.key,
+    this.initialIndex = 0,
+    required this.onLogout,
+    this.fotoPerfilUrl,
+  });
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();
 }
@@ -199,12 +231,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   void _navigate(int i) => setState(() => _index = i);
   @override
   Widget build(BuildContext context) => Scaffold(
-      body: IndexedStack(index: _index, children: [
-        HomePage(onNavigateTab: _navigate),
+    body: IndexedStack(
+      index: _index,
+      children: [
+        HomePage(onNavigateTab: _navigate, fotoPerfilUrl: widget.fotoPerfilUrl),
         const HistoricoScreen(),
         const SelecionarLeituraScreen(),
-        PerfilScreen(onLogout: widget.onLogout)
-      ]),
-      bottomNavigationBar:
-          AppBottomNav(currentIndex: _index, onTap: _navigate));
+        PerfilScreen(
+          onLogout: widget.onLogout,
+          fotoPerfilUrl: widget.fotoPerfilUrl,
+        ),
+      ],
+    ),
+    bottomNavigationBar: AppBottomNav(currentIndex: _index, onTap: _navigate),
+  );
 }

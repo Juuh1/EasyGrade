@@ -1,81 +1,93 @@
-import '../data/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
+import '../models/avaliacao.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import 'auth_screens.dart';
+import '../widgets/avatar_perfil.dart';
 import 'apoio_screens.dart';
-import 'splash_screen.dart';
 
 class PerfilScreen extends StatelessWidget {
   final VoidCallback onLogout;
-  const PerfilScreen({super.key, required this.onLogout});
+  final String? fotoPerfilUrl;
+  const PerfilScreen({super.key, required this.onLogout, this.fotoPerfilUrl});
   @override
   Widget build(BuildContext context) {
     final store = SessionScope.of(context);
     return AppPage(
-        title: 'Perfil',
-        root: true,
-        child: ListView(padding: const EdgeInsets.all(24), children: [
+      title: 'Perfil',
+      root: true,
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
           const PageHeading(title: 'Meu perfil'),
           SurfaceCard(
-              color: AppColors.softPurple,
-              child: Row(children: [
-                CircleAvatar(
-                    radius: 31,
-                    backgroundColor: AppColors.lavender,
-                    child: Text(
-                        store.nome.isEmpty ? '?' : store.nome[0].toUpperCase(),
-                        style: const TextStyle(
-                            color: AppColors.primaryDark,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800))),
+            color: AppColors.softPurple,
+            child: Row(
+              children: [
+                AvatarPerfil(
+                  radius: 31,
+                  nome: store.nome,
+                  fotoUrl: fotoPerfilUrl,
+                  fontSize: 24,
+                ),
                 const SizedBox(width: 18),
                 Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(store.nome,
-                          style: Theme.of(context).textTheme.titleLarge),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        store.nome,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
                       const SizedBox(height: 4),
                       Text(store.email, style: const TextStyle(fontSize: 12)),
                       const SizedBox(height: 6),
-                      Text(store.instituicao,
-                          style: const TextStyle(fontSize: 11))
-                    ]))
-              ])),
+                      Text(
+                        store.instituicao,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SectionHeading('Sua conta'),
           ActionTile(
-              icon: Icons.edit_outlined,
-              title: 'Editar perfil',
-              subtitle: 'Nome e instituição.',
-              onTap: () => abrir(context, const EditarUsuarioScreen())),
-          ActionTile(
-              icon: Icons.lock_outline_rounded,
-              title: 'Alterar senha',
-              subtitle: 'Atualize sua senha de acesso.',
-              onTap: () => abrir(context, const AlterarSenhaScreen())),
+            icon: Icons.edit_outlined,
+            title: 'Editar perfil',
+            subtitle: 'Nome e instituição.',
+            onTap: () => abrir(context, const EditarUsuarioScreen()),
+          ),
           const SectionHeading('Preferências e ajuda'),
           ActionTile(
-              icon: Icons.tune_rounded,
-              title: 'Configurações',
-              subtitle: 'Movimento, abertura e informações do app.',
-              onTap: () => abrir(context, const ConfiguracoesScreen())),
+            icon: Icons.tune_rounded,
+            title: 'Configurações',
+            subtitle: 'Pontuação padrão e informações do aplicativo.',
+            onTap: () => abrir(context, const ConfiguracoesScreen()),
+          ),
           ActionTile(
-              icon: Icons.help_outline_rounded,
-              title: 'Como funciona',
-              subtitle: 'Conheça o caminho da prova física ao resultado.',
-              onTap: () => abrir(context, const AjudaScreen())),
+            icon: Icons.help_outline_rounded,
+            title: 'Como funciona',
+            subtitle: 'Conheça o caminho da prova física ao resultado.',
+            onTap: () => abrir(context, const AjudaScreen()),
+          ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-              onPressed: onLogout,
-              icon: const Icon(Icons.logout_rounded, size: 19),
-              label: const Text('Sair da conta')),
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout_rounded, size: 19),
+            label: const Text('Sair da conta'),
+          ),
           const SizedBox(height: 20),
           const Center(
-              child: Text('EasyGrade · versão 1.0.0',
-                  style: TextStyle(fontSize: 10, color: AppColors.textMuted)))
-        ]));
+            child: Text(
+              'EasyGrade · versão 1.0.0',
+              style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -113,189 +125,168 @@ class _EditarUsuarioScreenState extends State<EditarUsuarioScreen> {
 
   @override
   Widget build(BuildContext _) => AppPage(
-      title: 'Editar perfil',
-      child: ListView(padding: const EdgeInsets.all(24), children: [
+    title: 'Editar perfil',
+    child: ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
         const PageHeading(
-            title: 'Editar perfil',
-            subtitle: 'Mantenha seu nome e sua instituição atualizados.'),
+          title: 'Editar perfil',
+          subtitle: 'Mantenha seu nome e sua instituição atualizados.',
+        ),
         Form(
-            key: _form,
-            child: Column(children: [
+          key: _form,
+          child: Column(
+            children: [
               TextFormField(
-                  controller: _nome,
-                  decoration: const InputDecoration(labelText: 'Nome'),
-                  validator: obrigatorio),
+                controller: _nome,
+                decoration: const InputDecoration(labelText: 'Nome'),
+                validator: obrigatorio,
+              ),
               const SizedBox(height: 16),
               TextFormField(
-                  controller: _email,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                      labelText: 'E-mail da conta',
-                      helperText: 'Vinculado ao seu método de acesso.'),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: validarEmail),
+                controller: _email,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'E-mail da conta',
+                  helperText: 'Vinculado à sua conta EasyGrade.',
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
               const SizedBox(height: 16),
               TextFormField(
-                  controller: _instituicao,
-                  decoration: const InputDecoration(labelText: 'Instituição'),
-                  validator: obrigatorio)
-            ])),
+                controller: _instituicao,
+                maxLength: 200,
+                decoration: const InputDecoration(
+                  labelText: 'Instituição (opcional)',
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 24),
         ElevatedButton(
-            onPressed: _salvando
-                ? null
-                : () async {
-                    if (!_form.currentState!.validate()) return;
-                    final store = SessionScope.of(context);
-                    setState(() => _salvando = true);
-                    try {
-                      await store.salvarPerfil(_nome.text, _instituicao.text);
-                      if (!mounted) return;
-                      Navigator.pop(context);
-                    } catch (e) {
-                      if (mounted) {
-                        avisar(context,
-                            'Não foi possível salvar o perfil. Confira a conexão.');
-                      }
-                    } finally {
-                      if (mounted) setState(() => _salvando = false);
+          onPressed: _salvando
+              ? null
+              : () async {
+                  if (!_form.currentState!.validate()) return;
+                  final store = SessionScope.of(context);
+                  setState(() => _salvando = true);
+                  try {
+                    await store.salvarPerfil(_nome.text, _instituicao.text);
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                  } catch (e) {
+                    if (mounted) {
+                      avisar(
+                        context,
+                        'Não foi possível salvar o perfil. Confira a conexão.',
+                      );
                     }
-                  },
-            child: const Text('Salvar alterações'))
-      ]));
-}
-
-class AlterarSenhaScreen extends StatefulWidget {
-  const AlterarSenhaScreen({super.key});
-  @override
-  State<AlterarSenhaScreen> createState() => _AlterarSenhaScreenState();
-}
-
-class _AlterarSenhaScreenState extends State<AlterarSenhaScreen> {
-  final _form = GlobalKey<FormState>();
-  final _senha = TextEditingController(), _atual = TextEditingController();
-  bool _salvando = false;
-  @override
-  void dispose() {
-    _senha.dispose();
-    _atual.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext _) => AppPage(
-      title: 'Alterar senha',
-      child: ListView(padding: const EdgeInsets.all(24), children: [
-        const PageHeading(
-            title: 'Alterar senha',
-            subtitle: 'Confirme sua senha atual para definir uma nova senha.'),
-        Form(
-            key: _form,
-            child: Column(children: [
-              TextFormField(
-                  controller: _atual,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Senha atual'),
-                  validator: obrigatorio),
-              const SizedBox(height: 16),
-              TextFormField(
-                  controller: _senha,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Nova senha'),
-                  validator: (v) => (v?.length ?? 0) < 6
-                      ? 'Use pelo menos 6 caracteres.'
-                      : null),
-              const SizedBox(height: 16),
-              TextFormField(
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Confirmar nova senha'),
-                  validator: (v) =>
-                      v != _senha.text ? 'As senhas devem ser iguais.' : null)
-            ])),
-        const SizedBox(height: 20),
-        const InfoBanner(
-            'Se você acessa pelo Google, a senha é gerenciada na sua conta Google. Para recuperar um acesso por senha, use a recuperação na tela de login.'),
-        const SizedBox(height: 24),
-        ElevatedButton(
-            onPressed: _salvando
-                ? null
-                : () async {
-                    if (!_form.currentState!.validate()) return;
-                    final auth = SessionScope.of(context).autenticacao;
-                    if (auth == null || !auth.usaSenha) {
-                      avisar(context,
-                          'A senha deste acesso é gerenciada na conta Google.');
-                      return;
-                    }
-                    setState(() => _salvando = true);
-                    try {
-                      await auth.alterarSenha(_atual.text, _senha.text);
-                      if (!mounted) return;
-                      Navigator.pop(context);
-                      avisar(context, 'Senha alterada.');
-                    } catch (e) {
-                      if (mounted) avisar(context, mensagemAutenticacao(e));
-                    } finally {
-                      if (mounted) setState(() => _salvando = false);
-                    }
-                  },
-            child: Text(_salvando ? 'Salvando…' : 'Alterar senha'))
-      ]));
+                  } finally {
+                    if (mounted) setState(() => _salvando = false);
+                  }
+                },
+          child: const Text('Salvar alterações'),
+        ),
+      ],
+    ),
+  );
 }
 
 class ConfiguracoesScreen extends StatelessWidget {
   const ConfiguracoesScreen({super.key});
+
+  Future<void> _editarLimite(BuildContext context, SessionStore store) async {
+    final form = GlobalKey<FormState>();
+    var valor = formatarPontos(store.pontuacaoPadrao);
+    int? pontos() {
+      final numero = double.tryParse(valor.trim().replaceAll(',', '.'));
+      if (numero == null || !numero.isFinite || numero < 1 || numero > 10) {
+        return null;
+      }
+      return (numero * 100).round();
+    }
+
+    final escolhido = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pontuação padrão'),
+        content: Form(
+          key: form,
+          child: TextFormField(
+            initialValue: valor,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Pontos'),
+            onChanged: (v) => valor = v,
+            validator: (_) =>
+                pontos() == null ? 'Informe um valor de 1 a 10.' : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) {
+                Navigator.pop(context, pontos());
+              }
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (escolhido == null || !context.mounted) return;
+    try {
+      await store.salvarPontuacaoPadrao(escolhido);
+    } catch (_) {
+      if (context.mounted) {
+        avisar(context, 'Não foi possível salvar a pontuação padrão.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = SessionScope.of(context);
     return AppPage(
-        title: 'Configurações',
-        child: ListView(padding: const EdgeInsets.all(24), children: [
+      title: 'Configurações',
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
           const PageHeading(title: 'Configurações'),
-          SurfaceCard(
-              child: SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Reduzir movimento',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                  subtitle: const Text(
-                      'Pule a animação de abertura. A preferência de acessibilidade do aparelho também é respeitada.',
-                      style: TextStyle(fontSize: 12)),
-                  value: store.reduzirMovimento,
-                  onChanged: (v) async {
-                    try {
-                      await store.salvarMovimento(v);
-                    } catch (e) {
-                      if (context.mounted) {
-                        avisar(
-                            context, 'Não foi possível salvar a preferência.');
-                      }
-                    }
-                  })),
-          const SizedBox(height: 16),
           ActionTile(
-              icon: Icons.play_circle_outline_rounded,
-              title: 'Rever animação de abertura',
-              subtitle: 'Uma folha de respostas se transforma na marca.',
-              onTap: () => abrir(context,
-                  SplashScreen(onComplete: () => Navigator.pop(context)))),
+            icon: Icons.grade_outlined,
+            title: 'Pontuação padrão',
+            subtitle:
+                '${formatarPontos(store.pontuacaoPadrao)} pontos para novas avaliações neste dispositivo.',
+            onTap: () => _editarLimite(context, store),
+          ),
           const SectionHeading('Sobre o EasyGrade'),
           const SurfaceCard(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Brand(size: 34),
                 SizedBox(height: 20),
                 Text(
-                    'Aplicativo acadêmico para preparar e corrigir avaliações objetivas em papel, com revisão das marcações e análise dos resultados.',
-                    style: TextStyle(fontSize: 12)),
+                  'Aplicativo acadêmico para preparar e corrigir avaliações objetivas em papel, com revisão das marcações e análise dos resultados.',
+                  style: TextStyle(fontSize: 12),
+                ),
                 SizedBox(height: 20),
                 Eyebrow('Versão 1.0.0'),
                 SizedBox(height: 12),
                 InfoBanner(
-                    'Seus dados são privados e vinculados à sua conta. A leitura usa as folhas identificadas geradas pelo EasyGrade e exige revisão antes de confirmar o resultado.')
-              ]))
-        ]));
+                  'Seus dados são privados e vinculados à sua conta. A leitura usa as folhas identificadas geradas pelo EasyGrade e exige revisão antes de confirmar o resultado.',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

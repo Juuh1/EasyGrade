@@ -5,7 +5,6 @@ import '../data/session_store.dart';
 import '../models/correcao.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_ui.dart';
-import 'auth_screens.dart';
 
 class TurmasScreen extends StatelessWidget {
   const TurmasScreen({super.key});
@@ -510,7 +509,7 @@ class _QuestoesScreenState extends State<QuestoesScreen> {
                             !await confirmar(
                                 context,
                                 'Atualizar questões e referência?',
-                                'As respostas das questões selecionadas serão usadas no gabarito. As posições restantes ficarão sem resposta.',
+                                'O gabarito será atualizado e as versões antigas perderão a validade. Gere os materiais novamente após alterar a prova.',
                                 action: 'Atualizar')) {
                           return;
                         }
