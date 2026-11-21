@@ -891,7 +891,7 @@ class AjudaScreen extends StatelessWidget {
                 ])))),
         const SizedBox(height: 12),
         const InfoBanner(
-            'Gere as folhas no app, imprima em A4 e fotografe com os quatro cantos visíveis. Revise as respostas antes de confirmar. Para salvar ou recuperar seus dados, mantenha uma conexão com a internet.',
+            'Gere as folhas no app e imprima em A4. Revise as respostas antes de confirmar. Para salvar ou recuperar seus dados, mantenha uma conexão com a internet.',
             icon: Icons.science_outlined)
       ]));
 }

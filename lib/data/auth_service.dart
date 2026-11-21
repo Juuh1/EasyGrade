@@ -21,6 +21,14 @@ class AuthService {
     await auth.signInWithEmailAndPassword(email: email.trim(), password: senha);
   }
 
+  Future<void> recuperarSenha(String email) async {
+    try {
+      await auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (erro) {
+      if (erro.code != 'user-not-found') rethrow;
+    }
+  }
+
   Future<void> cadastrar({
     required String email,
     required String senha,

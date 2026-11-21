@@ -70,6 +70,69 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  Future<void> _recuperarSenha() async {
+    if (_ocupado || widget.authService == null) return;
+    final formulario = GlobalKey<FormState>();
+    var endereco = _email.text.trim();
+    final email = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Recuperar senha'),
+        content: Form(
+          key: formulario,
+          child: TextFormField(
+            initialValue: endereco,
+            onChanged: (valor) => endereco = valor,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'E-mail da conta'),
+            validator: (valor) =>
+                RegExp(
+                  r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                ).hasMatch(valor?.trim() ?? '')
+                ? null
+                : 'Informe um e-mail válido.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (formulario.currentState!.validate()) {
+                Navigator.pop(context, endereco.trim());
+              }
+            },
+            child: const Text('Enviar link'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || email == null) return;
+    setState(() {
+      _ocupado = true;
+      _erro = null;
+    });
+    try {
+      await widget.authService!.recuperarSenha(email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Se este e-mail tiver uma conta com senha, você receberá um link para redefini-la. Confira também o spam.',
+            ),
+          ),
+        );
+      }
+    } catch (erro) {
+      if (mounted) setState(() => _erro = mensagemAutenticacao(erro));
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -196,6 +259,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   if (!_criando) ...[
+                    TextButton(
+                      onPressed: _ocupado || widget.authService == null
+                          ? null
+                          : _recuperarSenha,
+                      child: const Text('Esqueci minha senha'),
+                    ),
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
                       onPressed: _ocupado || widget.authService == null

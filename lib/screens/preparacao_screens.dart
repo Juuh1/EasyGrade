@@ -258,7 +258,7 @@ class _MateriaisScreenState extends State<MateriaisScreen> {
                 : () => abrir(context, LayoutProvaScreen(avaliacaoId: a.id)),
           ),
           const InfoBanner(
-            'Imprima as folhas em A4, no tamanho original. Não recorte o QR nem as quatro marcas dos cantos. Use o PDF para a leitura automática; edite apenas os cadernos no Word.',
+            'Imprima as folhas em A4, no tamanho original. Use o PDF para a leitura automática; edite apenas os cadernos no Word.',
           ),
         ],
       ),

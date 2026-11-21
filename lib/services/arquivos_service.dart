@@ -325,7 +325,7 @@ class ArquivosService {
                 right: 49,
                 top: 764,
                 child: pw.Text(
-                  'Preencha uma bolha por questão com caneta preta ou azul. Mantenha as quatro marcas dos cantos visíveis ao fotografar.',
+                  'Preencha uma bolha por questão com caneta preta ou azul.',
                   style: const pw.TextStyle(fontSize: 9),
                 ),
               ),

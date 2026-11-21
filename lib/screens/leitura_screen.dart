@@ -299,8 +299,7 @@ class _CapturaScreenState extends State<CapturaScreen> {
           title: widget.gabarito
               ? 'Fotografar o gabarito'
               : 'Fotografar a folha',
-          subtitle:
-              'Use a folha gerada pelo EasyGrade. Mantenha o QR e as quatro marcas dos cantos visíveis.',
+          subtitle: 'Use a folha gerada pelo EasyGrade.',
         ),
         if (_foto != null)
           ClipRRect(
