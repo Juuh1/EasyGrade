@@ -2,9 +2,91 @@
   <img src="SVG/easygradelogo.svg" alt="EasyGrade" width="320">
 </p>
 
-# EasyGrade
+# EasyGrade · entrega final N3
 
-Aplicativo Flutter para professores que corrigem avaliações objetivas em papel. O professor prepara a avaliação e as folhas de respostas, fotografa cada folha e revisa as marcações reconhecidas antes de confirmar os resultados.
+**Versão 1.0.0 · build 6 · 21/11/2026**
+
+Aplicativo para professores prepararem e corrigirem avaliações objetivas em papel. O EasyGrade gera materiais identificados, reconhece as respostas fotografadas e apresenta notas e análises após a revisão do professor.
+
+**[Manual do usuário](manual/README.md)** · **[APK Android](EasyGrade.apk)** · **[Validação e checklist de entrega](documentacao/VALIDACAO.md)** · **[Roteiro da apresentação](documentacao/APRESENTACAO.md)**
+
+## N3 · versão atual
+
+O escopo implementado reúne cadastro e acesso por e-mail/senha ou Google, recuperação de senha, turmas e alunos, banco de questões, avaliações com pesos, gabaritos, versões A/B, impressão para toda a turma, leitura de folhas, revisão, resultados e exportação.
+
+As últimas alterações incluem a arte de giz no início, o botão **iniciar correção**, pesos das questões alinhados e legíveis e a simplificação dos avisos de interface e impressão. O cadastro permite informar instituição opcional; a foto Google aparece quando disponível.
+
+A compilação e os testes automatizados são registrados no [relatório de validação](documentacao/VALIDACAO.md). A conferência final com câmera no Android e a situação de Issues/PRs são verificações separadas; consulte esse relatório antes da submissão. Não se considera uma captura de tela de teste como evidência de uso da câmera física.
+
+### Telas da versão atual
+
+<table>
+  <tr>
+    <td align="center"><img src="manual/imagens/03-inicio.png" alt="Início com o banner de giz e navegação" width="240"><br>Início</td>
+    <td align="center"><img src="manual/imagens/08-pesos.png" alt="Vinte questões com pesos alinhados e identificados" width="240"><br>Pesos das questões</td>
+    <td align="center"><img src="manual/imagens/14-resultados.png" alt="Notas e indicadores da turma" width="240"><br>Resultados</td>
+  </tr>
+</table>
+
+As imagens foram capturadas da interface atual, renderizada em tamanho de celular com dados fictícios. O [manual ilustrado](manual/README.md) apresenta o acesso, a preparação, a impressão, a revisão e os relatórios.
+
+| Área | Telas e etapas disponíveis |
+| --- | --- |
+| Acesso | Login, criação de conta e diálogo de recuperação de senha. |
+| Navegação | Abertura, início, avaliações, filtros, seleção para leitura e perfil. |
+| Avaliação | Criação/edição, confirmação de criação, detalhes, gabarito e seleção de enunciados. |
+| Cadastros | Turmas, alunos, novo aluno, importação, banco e nova questão. |
+| Materiais | Seleção de alunos/documentos, versões A/B, organização de páginas e visualização/impressão de PDF. |
+| Correção | Captura/seleção de imagem, revisão e resultado individual. |
+| Análise | Resultados da turma, análise por questão e relatório Excel. |
+| Conta | Perfil, edição, configurações, ajuda e saída. |
+
+### Escopo entregue
+
+1. **Preparar:** cadastrar turma e alunos, importar listas e cadastrar questões.
+2. **Montar:** criar avaliação, configurar pesos e definir o gabarito; selecionar enunciados quando desejar gerar o caderno.
+3. **Imprimir:** gerar folhas identificadas por aluno e modelo; reunir toda a turma em um PDF, visualizar, imprimir ou compartilhar.
+4. **Corrigir:** fotografar ou selecionar a imagem de uma folha, identificar o QR, revisar as marcações e confirmar a nota.
+5. **Analisar:** consultar resultados individuais, indicadores da turma, distribuição das alternativas e planilhas.
+
+O professor pode usar uma prova elaborada fora do app: o banco de questões é opcional para esse caminho, mas as folhas de respostas devem ser geradas pelo EasyGrade. Para gerar cadernos completos, é necessário selecionar todos os enunciados.
+
+### Requisitos funcionais finais
+
+Os códigos RF01–RF07 da N2 são mantidos para permitir comparação. A N3 detalha e consolida esses mesmos temas.
+
+| Código | Requisito final e comportamento implementado | Onde conferir |
+| --- | --- | --- |
+| RF01 | Criar conta com usuário, nome, e-mail e senha; instituição opcional; entrar por senha ou Google; recuperar senha por e-mail; manter sessão e sair. | Acesso, cadastro e Perfil |
+| RF02 | Criar, consultar, buscar, filtrar, editar, duplicar, excluir e concluir avaliações; configurar gabarito, data opcional, quantidade de questões/alternativas e pesos. | Avaliações, detalhes, criação e gabarito |
+| RF03 | Organizar turmas e alunos; cadastrar e editar nomes; identificar por matrícula; importar XLSX, CSV ou lista de texto, tratando matrículas repetidas. | Turmas e alunos |
+| RF04 | Manter banco de questões; compor cadernos; organizar páginas; gerar versões A/B com embaralhamento opcional de questões e alternativas; gerar folhas, cadernos e prova completa em PDF e cadernos em Word; imprimir a turma em uma operação. | Banco de questões e Materiais |
+| RF05 | Ler QR e marcações de uma foto; identificar aluno/modelo; aplicar a ordem das questões e alternativas e os pesos; exigir revisão das marcações incertas; confirmar ou substituir a correção de um aluno. | Correção, captura e revisão |
+| RF06 | Exibir nota individual, média, maior/menor nota, andamento e estatísticas por questão; exportar notas e respostas para Excel. | Resultados, análise e relatório |
+| RF07 | Consultar e editar perfil; mostrar foto Google quando disponível; configurar a pontuação padrão para novas avaliações; acessar ajuda. | Perfil e Configurações |
+
+### Requisitos não funcionais finais
+
+| Código | Requisito | Implementação ou critério de verificação |
+| --- | --- | --- |
+| RNF01 | Separar os dados por conta. | Caminhos `usuarios/{uid}`, autenticação e regras do Firestore; testes das regras incluídos em `test/firestore.test.cjs`. |
+| RNF02 | Processar a foto localmente. | Identificação e marcações são tratadas no dispositivo; as fotos não são enviadas ao Firestore. |
+| RNF03 | Interface em português, consistente e adaptável. | Tema compartilhado, fonte local, testes de telas com 320 e 430 px e texto ampliado; grade de pesos também conferida com 20 questões. |
+| RNF04 | Exigir conexão para acesso e dados da conta. | Autenticação e persistência dependem de internet; o aplicativo não promete operação completa sem conexão. |
+| RNF05 | Dar ao professor controle sobre a correção. | Marcações incertas impedem confirmar até serem revisadas; respostas em branco valem zero; releitura substitui o resultado após confirmação. |
+| RNF06 | Manter o projeto organizado e reproduzível. | Camadas de dados, modelos, telas, serviços, tema e componentes; dependências declaradas e arquivos de teste com imagens de referência. |
+| RNF07 | Preservar a coerência dos materiais já corrigidos. | Composição, formato e pesos são bloqueados após a primeira correção; mudanças de modelos antes das correções exigem gerar e imprimir novos materiais. |
+
+### Regras e limites de uso
+
+- Avaliações de **1 a 60 questões**, com **2 a 5 alternativas**, uniformes na mesma avaliação. Questões incompatíveis ficam indisponíveis na seleção.
+- A pontuação padrão é escolhida em Configurações e usada nas novas avaliações. Os pesos automáticos dividem esse limite; pesos manuais não redistribuem as outras questões. A soma não pode ultrapassar o limite.
+- O planejamento informa data e hora para organização e filtros; **não cria lembrete ou notificação**.
+- Cada QR identifica avaliação, aluno e modelo. A correção é feita **uma folha por vez**, com revisão; não há captura automática de um lote de fotos.
+- Imprima os PDFs em A4, no tamanho original. A leitura depende da qualidade da impressão e da foto. O Word é destinado à edição do caderno, não à alteração do modelo de leitura.
+- Alterar questões ou gerar versões invalida os materiais anteriores. Gere os modelos antes de imprimir e não os regenere durante a aplicação da mesma prova.
+- A folha impressa reserva um espaço para o professor escrever a nota, sem denominador fixo como “/10”. O resultado calculado é consultado no app.
+- O aplicativo é uma ferramenta do professor. O aluno responde à avaliação em papel; não há portal de prova virtual.
 
 ## Equipe
 
@@ -15,121 +97,33 @@ Aplicativo Flutter para professores que corrigem avaliações objetivas em papel
 | Lorenzo Foralasso Kochemberger |
 | Eduardo Coelho |
 
-## Objetivo
+## Tecnologias e identidade
 
-Reduzir o tempo gasto na correção de avaliações objetivas e apoiar a devolutiva pedagógica com resultados individuais e análise das alternativas mais marcadas. Os alunos fazem a prova física, entregam a folha de respostas e podem levar o caderno para estudar.
+Flutter e Dart; Firebase Authentication e Cloud Firestore; ML Kit e ZXing para identificação; processamento local de imagens; PDF/Printing para materiais; Excel/CSV para planilhas. A fonte Manrope acompanha sua [licença OFL](assets/fonts/OFL.txt).
 
-## Versões do projeto
-
-| Versão | O que entrega | Dados |
-| --- | --- | --- |
-| **N1** | Protótipo navegável: login, criação, histórico e resultados | Mock, sem persistência |
-| **N1 reformulada** | Reforma visual e complementação: leitura simulada, revisão, turmas, banco de questões, materiais, análise e relatório | Fictícios, em memória |
-| **N2** | Integração com Firebase: autenticação real, Firestore, leitura de folhas no aparelho, geração de PDF e exportação em Excel | Cloud Firestore |
-
-Fluxo principal atual: entrar na conta, cadastrar turma e alunos, montar avaliação e gabarito, gerar e imprimir cadernos e folhas, fotografar as respostas, revisar a leitura e consultar ou exportar os resultados.
-
-## Requisitos funcionais
-
-Os códigos mudaram entre as versões. A tabela agrupa cada requisito pelo tema e mostra como ele estava em cada entrega, para facilitar a conferência do que foi cumprido, alterado ou deixado de fora.
-
-| Requisito | N1 | N1 reformulada | N2 (atual) |
-| --- | --- | --- | --- |
-| **Acesso, cadastro e recuperação de senha** | RF01 · simulado | RF01 · demonstrativo (User / User) | **RF01** · e-mail e senha ou Google, recuperação de senha e sessão mantida. *Alterado: agora é real.* |
-| **Tela inicial com atalhos** | RF02 · implementado | RF02 · navegável | Mantida nas telas de início e perfil, sem código próprio. |
-| **Criar avaliação** (nome, disciplina, turma, data, questões e alternativas) | RF03 · dados locais | RF03 · em memória | **RF02** · criar, consultar, editar e excluir avaliações e gabaritos, persistidos no Firestore. |
-| **Buscar e filtrar avaliações** (situação, disciplina, turma e período) | RF04 · dados mock | RF04 · dados da sessão | Mantida nas telas de avaliações e filtros, sem código próprio. |
-| **Detalhes e gerenciamento da avaliação** (rascunho, agendada, concluída) | RF05 · implementado | RF05 · edição, duplicação, exclusão e conclusão locais | Coberta pelo **RF02**. |
-| **Resultados individuais e indicadores da turma** (média, maior e menor nota) | RF06 · mock | RF06 · calculado sobre respostas fictícias | **RF06** · notas e estatísticas por aluno, turma e questão. |
-| **Ler e corrigir folhas de resposta** | RF07 · *próximas etapas* | RF07 · QR e captura simulados, comparação local com o gabarito | **RF05** · foto da folha, reconhecimento de identificação e marcações, revisão e confirmação. *Alterado: agora é real.* |
-| **Estatísticas por questão e alternativa assinalada** | RF08 · *próximas etapas* | RF08 · calculado sobre resultados confirmados | Coberta pelo **RF06**. |
-| **Relatório de notas em planilha** | RF09 · *próximas etapas* | RF09 · prévia da planilha, exportação simulada | **RF06** · exportação das respostas para Excel. |
-| **Turmas, alunos e importação** | RF10 · *próximas etapas* | RF10 · dados locais e planilha de exemplo fixa | **RF03** · organização de turmas e alunos; importação por XLSX, CSV ou texto. |
-| **Materiais impressos identificados** | RF10 · *próximas etapas* | RF10 · prévia da folha e do caderno | **RF04** · preparação de cadernos e folhas identificadas, com versões embaralhadas. |
-| **Banco de questões e composição do caderno** | — | RF11 · banco em memória | **RF04** · banco de questões persistido. |
-| **Configurar gabarito, conferir ambiguidades e reler um aluno** | — | RF12 · revisão obrigatória, substituição sem duplicar | Coberta pelo **RF05** (revisão antes da confirmação). |
-| **Perfil, senha e preferências** | Perfil e configurações locais (no escopo) | Edição de perfil, configurações e ajuda | **RF07** · consulta e atualização de perfil, senha e preferências da conta. |
-
-### Resumo da situação
-
-- **Cumpridos e mantidos:** acesso, avaliações, resultados, estatísticas, turmas, alunos, materiais, banco de questões, revisão e perfil.
-- **Alterados:** acesso, leitura de folhas, importação, exportação e persistência deixaram de ser simulados na N2. Os requisitos foram reagrupados de 12 para 7 códigos.
-- **Que eram *próximas etapas* na N1 e foram concluídos na N2:** leitura e correção de folhas (RF07), estatísticas por questão (RF08), relatório em planilha (RF09) e importação de alunos e geração de provas individualizadas (RF10).
-- **Sem código próprio na N2:** tela inicial e busca e filtros continuam nas telas, mas não aparecem mais como requisitos separados.
-
-## Requisitos não funcionais
-
-| Requisito | N1 | N1 reformulada | N2 (atual) |
-| --- | --- | --- | --- |
-| Interface simples, lógica e consistente | RNF01 | RNF01 · uma ação por etapa | RNF03 · em português e adaptada ao uso móvel |
-| Layout para celular e adaptação a larguras maiores | RNF02 | RNF02 · conteúdo limitado a 600 px | RNF03 |
-| Resposta rápida sem backend | RNF03 | RNF03 · dados e buscas sem backend | **Alterado:** RNF04 exige internet para autenticação e dados na nuvem. |
-| Separação de modelos, estado, telas, tema e componentes | RNF04 | RNF04 | Mantida na organização do código. |
-| Proteção dos dados dos usuários | RNF05 · *quando houver backend* | RNF05 · ações simuladas sinalizadas, sem persistência | **RNF01** · dados separados pelo identificador da conta, nas regras e no acesso ao Firestore. |
-| Flutter e Dart, multiplataforma | RNF06 | RNF06 · português brasileiro e fonte local | Mantido (Flutter e Dart). |
-| Redução de movimento, campos validados e texto ampliado | — | RNF07 | RNF03 · respeita a preferência por redução de movimento. |
-| Fotos processadas no aparelho | — | — | **RNF02** · fotos não são enviadas ao Firestore. |
-| Revisão da leitura pelo professor | — | — | **RNF05** · a leitura depende de impressão e foto adequadas e deve ser revisada antes da confirmação. |
-
-## Limites e pendências
-
-| Item | Situação |
+| Cor | Uso |
 | --- | --- |
-| Autenticação, persistência e integração com banco de dados | Fora do escopo da N1 e da reformulada; **concluídas na N2**. |
-| Câmera e QR Code | Simulados na N1 e na reformulada; **reais na N2**. |
-| Exportação para Excel | Simulada até a reformulada; **real na N2**. |
-| Impressão, PDF, paginação real e embaralhamento | Não implementados até a reformulada; **geração e versões embaralhadas na N2**. |
-| Funcionamento sem internet | Não suportado na N2 (RNF04). |
-| Qualidade da leitura | Depende de impressão em A4 no tamanho original, quatro marcas dos cantos visíveis e caneta preta ou azul. |
+| `#342047` | Roxo profundo, títulos e banner |
+| `#7952B9` | Ações e destaques |
+| `#B79AD8` | Lavanda, botão principal e marcações |
+| `#F0EAF8` | Superfícies de apoio |
 
+## Executar, validar e compilar
 
-O aplicativo reúne ainda cadastro e recuperação de acesso; edição e confirmação de avaliação; gabarito; seleção para leitura; relatório; turmas, alunos e importação; banco e criação de questões; materiais; perfil, alteração de senha, configurações e ajuda.
-
-## Tecnologias
-
-- **Flutter e Dart:** interface e aplicativo Android.
-- **Firebase Authentication:** contas de professores e login Google.
-- **Cloud Firestore:** avaliações, turmas, alunos, questões, gabaritos e correções.
-- **Google ML Kit, ZXing e QR Flutter:** identificação das folhas por QR Code.
-- **Image Picker e Image:** captura, seleção e processamento local das imagens.
-- **PDF e Printing:** geração, impressão e compartilhamento dos materiais.
-- **Excel e CSV:** importação de alunos e exportação de resultados.
-- **Manrope:** fonte local, com [licença OFL](assets/fonts/OFL.txt).
-
-Identidade visual: roxo `#7952B9`, roxo profundo `#342047`, lavanda `#B79AD8` e lilás `#F0EAF8`. O monograma EG usa branco sobre roxo no ícone de instalação e preto sem fundo dentro do aplicativo.
-
-## Organização do código
-
-```text
-lib/
-  data/       autenticação, acesso ao Firestore e estado da sessão
-  models/     modelos de avaliação, correção, filtros e status
-  screens/    telas e fluxos do aplicativo
-  services/   leitura de folhas, arquivos e importação
-  theme/      cores, tipografia e tema visual
-  widgets/    componentes reutilizados pelas telas
-android/      configuração da plataforma Android
-assets/       fonte Manrope
-docs/         documentação da N1 e imagens das telas
-SVG/          marcas e elementos vetoriais
-test/         testes de notas, ambiguidade, releitura, navegação, calendário e layout
-web/          recursos de execução no navegador
-```
-
-Os documentos ficam sob `usuarios/{uid}` no Firestore. O repositório de dados valida os caminhos aceitos e associa as operações ao usuário autenticado. As regras de acesso estão em `firestore.rules` e os índices em `firestore.indexes.json`. A [documentação da N1](docs/N1.md) relaciona as telas ao relato do cliente.
-
-## Como executar
-
-Requisitos: Flutter 3.41 ou superior, Dart 3.11 ou superior, Android SDK e Java 17 ou superior.
+Requer Flutter compatível com Dart **3.11 ou superior**. Para Android, instale Java 17 e o Android SDK/NDK solicitado pela versão do Flutter. O Gradle utiliza os valores definidos pelo SDK Flutter.
 
 ```sh
 flutter pub get
 flutter run
 ```
 
-A configuração pública do Firebase está em `lib/firebase_options.dart` (projeto `easygrade-dc9be`). Para o login Google em outra instalação Android, cadastre no Firebase o SHA do certificado de assinatura correspondente.
+Para testar no navegador do computador:
 
-Comandos de validação e build:
+```sh
+flutter run -d chrome --web-port 5000
+```
+
+Abra `http://localhost:5000`. O código é compartilhado, mas permissões de câmera, seleção de arquivos e impressão variam entre navegador e Android.
 
 ```sh
 flutter analyze
@@ -137,24 +131,44 @@ flutter test
 flutter build apk --release
 ```
 
-O APK entregue está em [`EasyGrade.apk`](EasyGrade.apk).
+O APK para entrega está na raiz, em [`EasyGrade.apk`](EasyGrade.apk). A configuração pública do Firebase está em `lib/firebase_options.dart`; as regras e índices estão em `firestore.rules` e `firestore.indexes.json`. Uma assinatura Android diferente exige cadastrar seu SHA no projeto Firebase para o login Google. A assinatura da entrega acadêmica é a assinatura local de desenvolvimento já usada neste projeto.
 
-## Backlog da N2
+Os testes opcionais das regras usam Node.js, Java e Firebase Emulator:
 
-| Responsável | Tarefa | Prazo previsto | Situação |
-| --- | --- | --- | --- |
-| Jorge | Configurar o projeto Firebase, Firestore, coleções e regras de segurança | 07/10/2026 | Concluída |
-| Jorge | Criar a camada reutilizável de acesso ao Firestore | 09/10/2026 | Concluída |
-| Juliana | Revisar e ajustar classes de domínio e Issues para a integração com dados reais | 12/10/2026 | Concluída |
-| Lorenzo | Substituir os mocks e integrar o módulo 1 ao Firestore | 13/10/2026 | Concluída |
-| Eduardo | Substituir os mocks e integrar os módulos 2 e 3 ao Firestore | 13/10/2026 | Concluída |
+```sh
+npm ci
+npm run test:firestore
+```
 
-### Complemento da N1
+Esses testes usam o projeto de demonstração `demo-easygrade`; não executam contra os dados de produção. Veja no [relatório](documentacao/VALIDACAO.md) quais verificações foram executadas nesta entrega.
 
-| Responsável | Tarefa | Período | Situação |
-| --- | --- | --- | --- |
-| Jorge | Reformulação visual e complementação da N1 | 01/10/2026 a 06/10/2026 | Concluída |
+### Organização
 
-## Apresentação
+```text
+lib/              dados, modelos, telas, serviços, tema e componentes
+android/          aplicativo e configuração Android
+web/              execução no navegador
+assets/           fonte, licença e arte do banner
+SVG/              marcas vetoriais
+manual/           manual ilustrado do usuário
+documentacao/     validação e roteiro da apresentação
+historico/        registros anteriores preservados
+test/             testes e imagens de referência para leitura
+EasyGrade.apk     APK atual
+```
 
-[Vídeo da primeira entrega](https://youtu.be/tSS6fOFkVIA), anterior à reformulação da N1.
+## Histórico · do mais recente para o mais antigo
+
+### N2 · dados e funções reais
+
+Autenticação, persistência, importação, leitura das folhas, materiais e exportação deixaram de ser demonstrativos. A N2 reagrupou os requisitos em RF01–RF07. O backlog, a comparação dos requisitos e todas as informações do README anterior foram preservados no **[README histórico da N2](historico/N2/README.md)**, inclusive a comparação com a N1 original e reformulada.
+
+### N1 reformulada · navegação e identidade
+
+Reforma visual, revisão das respostas, turmas, banco de questões, prévias de materiais e relatórios, ainda com dados locais e funções demonstrativas. O **[registro histórico da N1](historico/N1/README.md)** preserva suas regras, decisões de demonstração e correspondência com o relato do cliente.
+
+### N1 original · protótipo navegável
+
+Login, criação, histórico e resultados com dados fictícios, antes da integração com banco. **[Vídeo da primeira entrega](https://youtu.be/tSS6fOFkVIA)**, anterior à reformulação.
+
+Os registros históricos descrevem o estado de cada época e podem mencionar funções simuladas ou opções que já mudaram. Para o uso atual, consulte este README e o [manual](manual/README.md).

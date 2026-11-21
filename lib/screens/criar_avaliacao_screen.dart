@@ -223,24 +223,67 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
           else
             const Text('Toque em uma questão para ajustar seu peso.'),
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (var i = 0; i < _pesos.length; i++)
-                  ActionChip(
-                    label: Text(
-                      'Q${i + 1} · ${formatarPontos(_pesos[i] ?? automaticos[i])}',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const espacamento = 8.0;
+              final escala = MediaQuery.textScalerOf(context).scale(12) / 12;
+              final colunas =
+                  ((constraints.maxWidth + espacamento) /
+                          (92 * escala + espacamento))
+                      .floor()
+                      .clamp(1, 4);
+              final largura =
+                  (constraints.maxWidth - espacamento * (colunas - 1)) /
+                  colunas;
+              return Wrap(
+                spacing: espacamento,
+                runSpacing: espacamento,
+                children: [
+                  for (var i = 0; i < _pesos.length; i++)
+                    SizedBox(
+                      width: largura,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryDark,
+                          disabledForegroundColor: AppColors.textSecondary,
+                          backgroundColor: AppColors.softPurple,
+                          disabledBackgroundColor: AppColors.softPurple,
+                          minimumSize: const Size(0, 64),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                        ),
+                        onPressed: _salvando || _temCorrecoes
+                            ? null
+                            : () => _editarPeso(i, automaticos[i]),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Questão ${i + 1}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${formatarPontos(_pesos[i] ?? automaticos[i])} pt',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    tooltip: 'Peso da questão ${i + 1}',
-                    onPressed: _salvando || _temCorrecoes
-                        ? null
-                        : () => _editarPeso(i, automaticos[i]),
-                  ),
-              ],
-            ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -449,10 +492,6 @@ class _CriarAvaliacaoScreenState extends State<CriarAvaliacaoScreen> {
                         ),
                       )
                     : Text(_edicao ? 'Salvar alterações' : 'Criar avaliação'),
-              ),
-              const SizedBox(height: 12),
-              const InfoBanner(
-                'As informações da avaliação são salvas com segurança no Firebase Firestore.',
               ),
             ],
           ),

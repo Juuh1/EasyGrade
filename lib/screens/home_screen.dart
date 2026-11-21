@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import '../data/session_store.dart';
 import '../theme/app_theme.dart';
@@ -51,36 +49,31 @@ class HomePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(26),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 80,
-                  child: IgnorePointer(
-                    child: CustomPaint(painter: _ArteCorrecao()),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 110, 24, 24),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.lavender,
-                        foregroundColor: AppColors.primaryDark,
-                      ),
-                      onPressed: () => onNavigateTab(2),
-                      icon: const Icon(
-                        Icons.document_scanner_outlined,
-                        size: 20,
-                      ),
-                      label: const Text('Iniciar correção'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 3,
+                    child: Image.asset(
+                      'assets/images/correcao_giz.png',
+                      fit: BoxFit.contain,
+                      excludeFromSemantics: true,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.lavender,
+                      foregroundColor: AppColors.primaryDark,
+                    ),
+                    onPressed: () => onNavigateTab(2),
+                    icon: const Icon(Icons.document_scanner_outlined, size: 20),
+                    label: const Text('iniciar correção'),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -148,30 +141,6 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ArteCorrecao extends CustomPainter {
-  const _ArteCorrecao();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final passo = math.min(size.width / 4.4, 104.0);
-    final raio = passo * .43;
-    final margem = (size.width - 3 * passo) / 2;
-    final contorno = Paint()
-      ..color = AppColors.lavender.withValues(alpha: .54)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-    final preenchimento = Paint()..color = AppColors.primary;
-
-    for (var i = 0; i < 4; i++) {
-      final centro = Offset(margem + i * passo, raio * .40);
-      canvas.drawCircle(centro, raio, i == 2 ? preenchimento : contorno);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ArteCorrecao oldDelegate) => false;
 }
 
 class _Shortcut extends StatelessWidget {

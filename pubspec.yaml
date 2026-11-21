@@ -2,7 +2,7 @@ name: easy_grade
 description: >
   App de correção automatizada de provas
 publish_to: 'none'
-version: 1.0.0+5
+version: 1.0.0+6
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
@@ -44,6 +44,7 @@ flutter:
   uses-material-design: true
   assets:
     - SVG/
+    - assets/images/correcao_giz.png
   fonts:
     - family: Manrope
       fonts:

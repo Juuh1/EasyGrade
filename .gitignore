@@ -43,12 +43,10 @@ app.*.map.json
 /android/app/release
 
 # Apoio local
-/test/
 /integration_test/
 /coverage/
 /docs/
-/package.json
-/package-lock.json
 /EasyGrade-N1.apk
 /entrega/*.png
 !entrega/EasyGrade.apk
+/entrega/*.zip
