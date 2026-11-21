@@ -29,7 +29,6 @@ tmp/
 node_modules/
 .firebase/
 *-debug.log
-/entrega/*.apk
 
 # Arquivos locais de apoio
 /.codex*/
@@ -47,6 +46,7 @@ app.*.map.json
 /coverage/
 /docs/
 /EasyGrade-N1.apk
-/entrega/*.png
-!entrega/EasyGrade.apk
-/entrega/*.zip
+
+# Materiais locais de entrega e apoio acadêmico
+/entrega/
+/documentacao/

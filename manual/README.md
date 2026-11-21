@@ -4,7 +4,8 @@
 
 # Manual do usuário
 
-**EasyGrade · Android e Web · versão 1.0.0, build 6**  
+**EasyGrade · Android · versão 1.0.0, build 6**
+
 Revisão: 21/11/2026 · Público: professores e responsáveis pela aplicação de avaliações objetivas.
 
 Este manual explica como preparar uma prova em papel, imprimir as folhas da turma, corrigir as respostas e consultar as notas. Não exige conhecimento de programação. Os nomes, as turmas e os resultados das imagens são fictícios; as capturas mostram a interface atual renderizada em tamanho de celular.
@@ -57,10 +58,6 @@ O nome de usuário serve à identificação do perfil. Para o acesso com senha, 
 4. Volte ao EasyGrade e entre com a nova senha.
 
 O link se aplica à conta que usa senha. Para uma conta acessada exclusivamente pelo Google, use o acesso Google e os recursos de recuperação dessa conta.
-
-### Usar no navegador
-
-Abra o endereço informado pelo responsável pela instalação. Durante o desenvolvimento, o endereço local habitual é `http://localhost:5000`. No navegador, o professor pode preparar provas, selecionar fotos, gerar materiais e consultar resultados. A instalação da APK é o caminho para testar as permissões e a câmera no Android.
 
 ## 2. Conhecer o início
 
