@@ -72,31 +72,3 @@ O [manual ilustrado](manual/README.md) apresenta as telas de acesso, cadastros, 
 | **N1** | [Registro da N1](historico/N1/README.md), com fluxo, escopo e decisões do protótipo; [vídeo da primeira entrega](https://youtu.be/tSS6fOFkVIA). |
 
 Os arquivos históricos mantêm o contexto da época, incluindo funções que eram simuladas ou que mudaram. O uso da versão final está descrito no [manual do usuário](manual/README.md).
-
-<details>
-<summary><strong>Informações para desenvolvimento</strong></summary>
-
-Flutter/Dart, Firebase Authentication, Cloud Firestore, leitura local de imagens, PDF/Printing e Excel/CSV. A fonte Manrope acompanha sua [licença OFL](assets/fonts/OFL.txt).
-
-Use Flutter compatível com Dart 3.11 ou superior, Java 17 e o Android SDK/NDK solicitado pelo Flutter.
-
-```sh
-flutter pub get
-flutter run
-flutter analyze
-flutter test
-flutter build apk --release
-```
-
-A configuração pública está em `lib/firebase_options.dart`; as regras e índices estão em `firestore.rules` e `firestore.indexes.json`. Uma assinatura Android diferente exige cadastrar seu SHA para o login Google. A APK acadêmica usa a assinatura local já utilizada pelo projeto.
-
-Os testes opcionais das regras usam o Emulator e o projeto de demonstração `demo-easygrade`:
-
-```sh
-npm ci
-npm run test:firestore
-```
-
-`build/` e os caches são gerados localmente e ficam fora do repositório e do ZIP. O pacote de entrega contém o código-fonte, as configurações, os testes, o README, o manual, o histórico e a APK.
-
-</details>
