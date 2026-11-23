@@ -4,7 +4,7 @@
 
 # EasyGrade
 
-**Entrega final N3 · Android · versão 1.0.0, build 6**
+**Entrega final N3 · Android · versão 1.0.0, build 7**
 
 Aplicativo para professores prepararem avaliações objetivas em papel, imprimirem folhas identificadas, corrigirem respostas por foto e consultarem notas e análises.
 
