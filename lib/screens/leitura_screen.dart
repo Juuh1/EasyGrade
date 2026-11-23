@@ -189,6 +189,7 @@ class _CapturaScreenState extends State<CapturaScreen> {
       if (!mounted) return;
       setState(() => _foto = bytes);
       String? codigo;
+      List<Map<String, int>>? pontosQr;
       if (!kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS)) {
@@ -197,18 +198,27 @@ class _CapturaScreenState extends State<CapturaScreen> {
           final encontrados = await scanner.processImage(
             InputImage.fromFilePath(arquivo.path),
           );
-          codigo = encontrados
-              .map((v) => v.rawValue)
-              .whereType<String>()
-              .where((v) => v.contains('"eg"'))
+          final encontrado = encontrados
+              .where((v) => v.rawValue?.contains('"eg"') ?? false)
               .firstOrNull;
+          codigo = encontrado?.rawValue;
+          pontosQr = encontrado?.cornerPoints
+              .map((p) => <String, int>{'x': p.x, 'y': p.y})
+              .toList();
+        } catch (_) {
+          // O leitor local ainda pode reconhecer a imagem se o detector nativo falhar.
         } finally {
-          await scanner.close();
+          try {
+            await scanner.close();
+          } catch (_) {
+            // A limpeza do detector não deve impedir a leitura local da foto.
+          }
         }
       }
       final leitura = await compute(analisarFoto, <String, Object?>{
         'bytes': bytes,
         'codigo': codigo,
+        'pontosQr': pontosQr,
       });
       if (!mounted) return;
       final a = store.avaliacao(widget.avaliacaoId);
