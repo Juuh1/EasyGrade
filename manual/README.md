@@ -4,7 +4,7 @@
 
 # Manual do usuário
 
-**EasyGrade · Android · versão 1.0.0, build 6**
+**EasyGrade · Android · versão 1.0.0, build 7**
 
 Revisão: 21/11/2026 · Público: professores e responsáveis pela aplicação de avaliações objetivas.
 
